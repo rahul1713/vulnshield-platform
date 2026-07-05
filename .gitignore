@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+coverage/
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-data/
+
+# Reports output
+reports/output/
+
+# MinIO data
+minio-data/
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*

@@ -1,0 +1,338 @@
+x-common-env: &common-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-vulnshield}
+  POSTGRES_USER: ${POSTGRES_USER:-vulnshield}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vulnshield_secure_password}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USER: ${RABBITMQ_USER:-vulnshield}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-vulnshield_rabbit_password}
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-vulnshield_minio}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-vulnshield_minio_secret}
+  MINIO_BUCKET: ${MINIO_BUCKET:-vulnshield-evidence}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vulnshield-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vulnshield}
+      POSTGRES_USER: ${POSTGRES_USER:-vulnshield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vulnshield_secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/database/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vulnshield}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnshield-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: vulnshield-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnshield-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: vulnshield-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-vulnshield}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-vulnshield_rabbit_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-vulnshield}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - vulnshield-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: vulnshield-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-vulnshield_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-vulnshield_minio_secret}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vulnshield-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: vulnshield-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - vulnshield-net
+    profiles:
+      - ai
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: vulnshield-api-gateway
+    environment:
+      <<: *common-env
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-key-min-32-chars}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - vulnshield-net
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: vulnshield-auth
+    environment:
+      <<: *common-env
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-key-min-32-chars}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      LDAP_ENABLED: ${LDAP_ENABLED:-false}
+      MFA_ENABLED: ${MFA_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  asset-service:
+    build:
+      context: .
+      dockerfile: services/asset-service/Dockerfile
+    container_name: vulnshield-assets
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  scanner-service:
+    build:
+      context: .
+      dockerfile: services/scanner-service/Dockerfile
+    container_name: vulnshield-scanner
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  web-scanner-service:
+    build:
+      context: .
+      dockerfile: services/web-scanner-service/Dockerfile
+    container_name: vulnshield-web-scanner
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  ai-code-review:
+    build:
+      context: .
+      dockerfile: services/ai-code-review/Dockerfile
+    container_name: vulnshield-ai-code-review
+    environment:
+      <<: *common-env
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  ai-redteam:
+    build:
+      context: .
+      dockerfile: services/ai-redteam/Dockerfile
+    container_name: vulnshield-ai-redteam
+    environment:
+      <<: *common-env
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  patch-intelligence:
+    build:
+      context: .
+      dockerfile: services/patch-intelligence/Dockerfile
+    container_name: vulnshield-patch-intelligence
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  risk-engine:
+    build:
+      context: .
+      dockerfile: services/risk-engine/Dockerfile
+    container_name: vulnshield-risk-engine
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: services/reporting-service/Dockerfile
+    container_name: vulnshield-reporting
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - reports_data:/app/reports/output
+    networks:
+      - vulnshield-net
+
+  compliance-service:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    container_name: vulnshield-compliance
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: vulnshield-notifications
+    environment:
+      <<: *common-env
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+    container_name: vulnshield-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - vulnshield-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  ollama_data:
+  reports_data:
+
+networks:
+  vulnshield-net:
+    driver: bridge

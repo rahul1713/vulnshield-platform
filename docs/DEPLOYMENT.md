@@ -50,16 +50,11 @@ docker compose up -d
 
 ### With AI Services
 
-Includes Ollama for local LLM inference:
+Ollama starts automatically with the stack. Security AI (vulnerability scanning, code review, red teaming) uses **local Qwen 3.6 only**:
 
 ```bash
-docker compose --profile ai up -d
-```
-
-Pull a model after Ollama starts:
-
-```bash
-docker compose exec ollama ollama pull llama3.2
+docker compose up -d
+docker compose exec ollama ollama pull qwen3.6
 ```
 
 ## Environment Configuration
@@ -72,9 +67,11 @@ JWT_SECRET=your-256-bit-secret-here
 POSTGRES_PASSWORD=strong-random-password
 RABBITMQ_PASSWORD=strong-random-password
 
-# LLM provider
-LLM_PROVIDER=ollama          # ollama | openai | anthropic
-OLLAMA_MODEL=llama3.2
+# Security AI — local Ollama + Qwen 3.6 only (cloud providers not permitted)
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=qwen3.6
+AI_SECURITY_LOCAL_ONLY=true
+AI_SECURITY_ALLOWED_MODELS=qwen3.6
 
 # Notifications (optional)
 SMTP_HOST=smtp.company.com
@@ -233,7 +230,7 @@ docker run --rm \
 | Database connection refused | Wait for PostgreSQL health check; verify credentials in `.env` |
 | Frontend shows API errors | Confirm `NEXT_PUBLIC_API_URL` matches the gateway URL |
 | RabbitMQ connection failed | Verify vhost `vulnshield` exists and credentials match |
-| Ollama model not found | Run `docker compose exec ollama ollama pull llama3.2` |
+| Ollama model not found | Run `docker compose exec ollama ollama pull qwen3.6` |
 
 ## Cleanup
 

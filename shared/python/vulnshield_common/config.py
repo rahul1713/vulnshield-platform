@@ -35,9 +35,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
+    # Security AI (vulnerability scanning, code review, red team) uses local Ollama only.
     llm_provider: str = "ollama"
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "qwen3.6"
+    ai_security_local_only: bool = True
+    ai_security_allowed_models: str = "qwen3.6"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
     anthropic_api_key: str = ""

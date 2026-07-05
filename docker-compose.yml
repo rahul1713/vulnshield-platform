@@ -101,10 +101,14 @@ services:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - vulnshield-net
-    profiles:
-      - ai
 
   api-gateway:
     build:
@@ -169,6 +173,11 @@ services:
     container_name: vulnshield-scanner
     environment:
       <<: *common-env
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.6}
+      AI_SECURITY_LOCAL_ONLY: "true"
+      AI_SECURITY_ALLOWED_MODELS: qwen3.6
     depends_on:
       postgres:
         condition: service_healthy
@@ -176,6 +185,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - vulnshield-net
 
@@ -201,16 +212,18 @@ services:
     container_name: vulnshield-ai-code-review
     environment:
       <<: *common-env
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.6}
+      AI_SECURITY_LOCAL_ONLY: "true"
+      AI_SECURITY_ALLOWED_MODELS: qwen3.6
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - vulnshield-net
 
@@ -221,14 +234,18 @@ services:
     container_name: vulnshield-ai-redteam
     environment:
       <<: *common-env
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.6}
+      AI_SECURITY_LOCAL_ONLY: "true"
+      AI_SECURITY_ALLOWED_MODELS: qwen3.6
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - vulnshield-net
 

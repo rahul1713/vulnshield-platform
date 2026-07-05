@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from vulnshield_common.llm import get_llm_provider
+from vulnshield_common.llm import SecurityLLMConfigurationError, get_local_security_llm_provider
 from vulnshield_common.messaging import publish_event
 
 MITRE_TACTICS = [
@@ -32,7 +32,10 @@ async def create_campaign(db: AsyncSession, data: dict, user_id: UUID | None = N
 
 
 async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict):
-    llm = get_llm_provider()
+    try:
+        llm = get_local_security_llm_provider()
+    except SecurityLLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     system = (
         "You are a red team operator. Plan an attack campaign mapped to MITRE ATT&CK. "
         "Return JSON with keys: attack_chains (list of steps with technique_id, tactic, phase, description), "

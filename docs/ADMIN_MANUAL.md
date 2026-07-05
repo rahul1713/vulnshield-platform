@@ -154,13 +154,23 @@ Restart affected services after changes:
 docker compose up -d auth-service api-gateway
 ```
 
-### LLM Provider Configuration
+### LLM Provider Configuration (Security AI)
 
-| Provider | Variables |
-|----------|-----------|
-| Ollama (local) | `LLM_PROVIDER=ollama`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL` |
-| OpenAI | `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL` |
-| Anthropic | `LLM_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
+**Vulnerability scanning, AI code review, and red teaming are restricted to local Ollama with Qwen 3.6.** Cloud LLM providers cannot be used for these features — the platform rejects non-local or non-Qwen configurations at runtime.
+
+| Setting | Value |
+|---------|-------|
+| `LLM_PROVIDER` | `ollama` (required) |
+| `OLLAMA_BASE_URL` | `http://ollama:11434` (Docker) or `http://localhost:11434` |
+| `OLLAMA_MODEL` | `qwen3.6` (or `qwen3.6:27b`, `qwen3.6:35b-a3b`) |
+| `AI_SECURITY_LOCAL_ONLY` | `true` |
+| `AI_SECURITY_ALLOWED_MODELS` | `qwen3.6` |
+
+Pull the model after deployment:
+
+```bash
+docker compose exec ollama ollama pull qwen3.6
+```
 
 ### Notification Channels
 

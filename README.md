@@ -193,7 +193,7 @@ Install via `install.ps1` which registers a SYSTEM scheduled task.
 | Cache | Redis 7 |
 | Messaging | RabbitMQ 3.13 |
 | Storage | MinIO (S3-compatible) |
-| LLM | Ollama, OpenAI, Anthropic |
+| LLM (Security AI) | Local Ollama + Qwen 3.6 only |
 | Agents | Python, PowerShell |
 | CI/CD | GitHub Actions |
 | Orchestration | Docker Compose, Kubernetes |

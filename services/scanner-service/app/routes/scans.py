@@ -78,6 +78,18 @@ async def correlate(
     return await cve_service.correlate_scan(db, scan_id)
 
 
+@router.post("/{scan_id}/ai-analyze")
+async def ai_analyze(
+    scan_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: TokenPayload = Depends(require_permission("scans:write")),
+):
+    """AI vulnerability analysis — local Ollama Qwen 3.6 only."""
+    from app.services import ai_vuln_service
+
+    return await ai_vuln_service.ai_analyze_scan(db, scan_id)
+
+
 @router.post("/agentless", response_model=ScanResponse, status_code=201)
 async def agentless_scan(
     body: AgentlessScanRequest,

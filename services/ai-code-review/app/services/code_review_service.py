@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from vulnshield_common.llm import get_llm_provider
+from vulnshield_common.llm import SecurityLLMConfigurationError, get_local_security_llm_provider
 from vulnshield_common.messaging import publish_event
 
 SUPPORTED_LANGUAGES = {"python", "javascript", "typescript", "java", "go", "csharp", "ruby", "php", "c", "cpp", "rust", "kotlin", "swift"}
@@ -31,7 +31,10 @@ async def create_review(db: AsyncSession, data: dict, user_id: UUID | None = Non
 
 
 async def run_review(db: AsyncSession, review_id: UUID, data: dict):
-    llm = get_llm_provider()
+    try:
+        llm = get_local_security_llm_provider()
+    except SecurityLLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     code = data.get("source_code") or f"# Sample {data['language']} code for review"
     file_path = data.get("file_path") or "main." + data["language"][:2]
     system = (

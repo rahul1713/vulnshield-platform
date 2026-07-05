@@ -88,18 +88,32 @@ Test the API:
 curl -s http://localhost:8080/api/v1/health | jq .
 ```
 
-## Step 5: Enable AI Services (Optional)
+## Step 5: Pull Qwen 3.6 Model (Required for AI Features)
+
+Security AI features (vulnerability scanning, code review, red teaming) use **local Ollama with Qwen 3.6 only**. Cloud providers (OpenAI, Anthropic, Claude) are not supported for these workloads.
+
+After the stack is running, pull the model:
 
 ```bash
-docker compose --profile ai up -d ollama
-docker compose exec ollama ollama pull llama3.2
-docker compose up -d ai-code-review ai-redteam
+docker compose exec ollama ollama pull qwen3.6
+```
+
+For a lighter variant on limited hardware:
+
+```bash
+docker compose exec ollama ollama pull qwen3.6:27b
 ```
 
 Verify LLM connectivity:
 
 ```bash
 curl -s http://localhost:11434/api/tags | jq .
+```
+
+Restart AI services after the model is available:
+
+```bash
+docker compose up -d scanner-service ai-code-review ai-redteam
 ```
 
 ## Step 6: Configure Notifications (Optional)

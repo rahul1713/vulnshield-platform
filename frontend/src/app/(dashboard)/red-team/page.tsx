@@ -5,6 +5,8 @@ import { Security } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { redTeamApi } from '@/lib/api';
+import { isDemoSession } from '@/lib/api-client-helpers';
+import { waitForDemoReportInput } from '@/lib/demo-helpers';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
@@ -39,7 +41,10 @@ export default function RedTeamPage() {
   const createMutation = useMutation({
     mutationFn: ({ name, description }: { name: string; description: string }) =>
       redTeamApi.create(name, description),
-    onSuccess: () => {
+    onSuccess: async (campaign) => {
+      if (isDemoSession()) {
+        await waitForDemoReportInput(`redteam:${campaign.id}`);
+      }
       showToast('Campaign complete — executive PDF report ready', 'success');
       queryClient.invalidateQueries({ queryKey: ['red-team'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });

@@ -19,15 +19,20 @@ import {
   Vulnerability,
   WebScanFinding,
 } from '@/types';
-import { getStoredToken, MOCK_ACCESS_TOKEN } from '@/lib/auth';
-import { isDemoModeEnabled, getApiUrl } from '@/lib/env';
+import { getStoredToken } from '@/lib/auth';
+import { getApiUrl } from '@/lib/env';
 import {
   listParamsToOffset,
   normalizeDashboard,
   normalizePaginated,
   normalizeSearchResults,
 } from '@/lib/api-utils';
-import { demoStore } from '@/lib/demo-store';
+import { canUseDemoFallback, isDemoSession } from '@/lib/api-client-helpers';
+
+async function demo() {
+  const { demoStore } = await import('@/lib/demo-store');
+  return demoStore;
+}
 
 const API_URL = getApiUrl();
 
@@ -40,16 +45,6 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
-}
-
-/** Demo session: explicit env flag + mock token — never active in sandbox/production builds. */
-function isDemoSession(): boolean {
-  return isDemoModeEnabled() && getStoredToken() === MOCK_ACCESS_TOKEN;
-}
-
-/** Allow read-only mock fallbacks only when demo mode is explicitly enabled (local dev). */
-function canUseDemoFallback(): boolean {
-  return isDemoModeEnabled();
 }
 
 function buildQuery(params?: ListParams): string {
@@ -206,7 +201,7 @@ export const vulnerabilitiesApi = {
       return normalizePaginated<Vulnerability>(data, page, pageSize);
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
-      let items = demoStore.getVulnerabilities();
+      let items = (await demo()).getVulnerabilities();
       const search = params?.search as string | undefined;
       if (search) {
         items = items.filter((v) => v.title.toLowerCase().includes(search.toLowerCase()));
@@ -218,7 +213,7 @@ export const vulnerabilitiesApi = {
   get: (id: string) => request<Vulnerability>(`/vulnerabilities/${id}`),
   updateStatus: async (id: string, status: string) => {
     if (isDemoSession()) {
-      return demoStore.updateVulnerabilityStatus(id, status as Vulnerability['status']);
+      return (await demo()).updateVulnerabilityStatus(id, status as Vulnerability['status']);
     }
     return request(`/vulnerabilities/${id}/status?status=${encodeURIComponent(status)}`, { method: 'PATCH' });
   },
@@ -233,7 +228,7 @@ export const scansApi = {
     const { limit, offset, page, pageSize } = listParamsToOffset(params);
     if (isDemoSession()) {
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getScans(), page, pageSize);
+      return paginate((await demo()).getScans(), page, pageSize);
     }
     try {
       const data = await request<unknown>(`/scans?limit=${limit}&offset=${offset}`);
@@ -241,12 +236,12 @@ export const scansApi = {
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getScans(), page, pageSize);
+      return paginate((await demo()).getScans(), page, pageSize);
     }
   },
   get: async (id: string): Promise<Scan> => {
     if (isDemoSession()) {
-      const scan = demoStore.getScans().find((s) => s.id === id);
+      const scan = (await demo()).getScans().find((s) => s.id === id);
       if (!scan) throw new ApiError(404, 'Scan not found');
       return scan;
     }
@@ -254,13 +249,13 @@ export const scansApi = {
   },
   create: async (payload: { name: string; scan_type: ScanType; target_asset_id?: string; target_config?: Record<string, unknown> }) => {
     if (isDemoSession()) {
-      return demoStore.createScan(payload);
+      return (await demo()).createScan(payload);
     }
     return request<Scan>('/scans', { method: 'POST', body: JSON.stringify(payload) });
   },
   start: async (id: string) => {
     if (isDemoSession()) {
-      const scan = demoStore.startScan(id);
+      const scan = (await demo()).startScan(id);
       if (!scan) throw new ApiError(404, 'Scan not found');
       return scan;
     }
@@ -268,7 +263,7 @@ export const scansApi = {
   },
   cancel: async (id: string) => {
     if (isDemoSession()) {
-      return demoStore.updateScan(id, { status: 'cancelled' });
+      return (await demo()).updateScan(id, { status: 'cancelled' });
     }
     return request<Scan>(`/scans/${id}/cancel`, { method: 'POST' });
   },
@@ -288,12 +283,12 @@ export const webScannerApi = {
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getWebFindings(), page, pageSize);
+      return paginate((await demo()).getWebFindings(), page, pageSize);
     }
   },
   startScan: async (targetUrl: string) => {
     if (isDemoSession()) {
-      demoStore.startWebScan(targetUrl);
+      (await demo()).startWebScan(targetUrl);
       return { status: 'completed' };
     }
     return request('/web-scans', {
@@ -316,7 +311,7 @@ export const codeReviewApi = {
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getCodeReviews(), page, pageSize);
+      return paginate((await demo()).getCodeReviews(), page, pageSize);
     }
   },
   create: async (payload: {
@@ -327,7 +322,7 @@ export const codeReviewApi = {
     branch?: string;
   }) => {
     if (isDemoSession()) {
-      return demoStore.createCodeReview(payload);
+      return (await demo()).createCodeReview(payload);
     }
     return request<CodeReview & { report_id?: string }>('/reviews', {
       method: 'POST',
@@ -359,12 +354,12 @@ export const redTeamApi = {
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getRedTeamCampaigns(), page, pageSize);
+      return paginate((await demo()).getRedTeamCampaigns(), page, pageSize);
     }
   },
   create: async (name: string, description: string) => {
     if (isDemoSession()) {
-      return demoStore.createRedTeamCampaign(name, description);
+      return (await demo()).createRedTeamCampaign(name, description);
     }
     return request<RedTeamCampaign>('/campaigns', {
       method: 'POST',
@@ -400,7 +395,7 @@ export const reportsApi = {
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
       const { paginate } = await import('@/lib/mock-data');
-      return paginate(demoStore.getReports(), page, pageSize);
+      return paginate((await demo()).getReports(), page, pageSize);
     }
   },
   generate: async (payload: { name: string; report_type: string; format: string; parameters?: Record<string, unknown> }) => {

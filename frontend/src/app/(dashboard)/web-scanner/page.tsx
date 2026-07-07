@@ -1,7 +1,7 @@
 'use client';
 
-import { Button, IconButton, Stack } from '@mui/material';
-import { PlayArrow, PictureAsPdf } from '@mui/icons-material';
+import { Button, Stack } from '@mui/material';
+import { PlayArrow } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { webScannerApi } from '@/lib/api';
@@ -9,11 +9,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { SeverityChip } from '@/components/ui/SeverityChip';
 import { StartWebScanDialog } from '@/components/web-scanner/StartWebScanDialog';
+import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { useToast } from '@/components/ui/ToastProvider';
 import { WebScanFinding } from '@/types';
-import { demoStore } from '@/lib/demo-store';
-import { isDemoSession } from '@/lib/api-client-helpers';
-import { downloadPdfBlob, generateExecutivePdf } from '@/lib/executive-pdf';
 
 const columns: Column<WebScanFinding>[] = [
   { id: 'title', label: 'Finding', sortable: true },
@@ -43,22 +41,10 @@ export default function WebScannerPage() {
       setLastScanUrl(url);
       showToast('Web scan complete — download DAST PDF report', 'success');
       queryClient.invalidateQueries({ queryKey: ['web-scanner'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
-
-  const downloadWebReport = () => {
-    const key = `webscan:${lastScanUrl}`;
-    const input = isDemoSession()
-      ? demoStore.getReportInput(key)
-      : undefined;
-    if (!input) {
-      showToast('Run a web scan first', 'warning');
-      return;
-    }
-    downloadPdfBlob(generateExecutivePdf(input), `dast-report.pdf`);
-    showToast('DAST executive PDF downloaded', 'success');
-  };
 
   return (
     <>
@@ -68,9 +54,13 @@ export default function WebScannerPage() {
         action={
           <Stack direction="row" spacing={1}>
             {lastScanUrl && (
-              <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={downloadWebReport}>
-                Download PDF
-              </Button>
+              <ReportDownloadButton
+                label="Download PDF"
+                filename="dast-report.pdf"
+                demoReportKey={`webscan:${lastScanUrl}`}
+                entityType="webscan"
+                variant="outlined"
+              />
             )}
             <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setDialogOpen(true)}>
               Start Web Scan

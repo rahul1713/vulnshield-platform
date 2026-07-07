@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '@/lib/api';
+import { canUseDemoFallback } from '@/lib/api-client-helpers';
 import { MOCK_DASHBOARD } from '@/lib/mock-data';
 import { StatCard, StatCardsGrid } from '@/components/ui/StatCards';
 import {
@@ -36,7 +37,8 @@ async function fetchDashboard(type: 'executive' | 'soc'): Promise<DashboardData>
     return type === 'executive'
       ? await dashboardApi.getExecutive()
       : await dashboardApi.getSoc();
-  } catch {
+  } catch (err) {
+    if (!canUseDemoFallback()) throw err;
     return MOCK_DASHBOARD;
   }
 }

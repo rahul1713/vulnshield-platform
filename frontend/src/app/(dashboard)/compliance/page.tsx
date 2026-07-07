@@ -4,7 +4,6 @@ import { LinearProgress, Box } from '@mui/material';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { complianceApi } from '@/lib/api';
-import { MOCK_COMPLIANCE, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { ComplianceAssessment } from '@/types';
@@ -39,13 +38,7 @@ export default function CompliancePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['compliance', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await complianceApi.listAssessments({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_COMPLIANCE, page + 1, pageSize);
-      }
-    },
+    queryFn: () => complianceApi.listAssessments({ page: page + 1, page_size: pageSize }),
   });
 
   return (

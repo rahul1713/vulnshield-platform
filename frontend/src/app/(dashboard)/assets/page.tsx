@@ -1,10 +1,9 @@
 'use client';
 
-import { Button, Chip } from '@mui/material';
+import { Button, Chip, Alert } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { assetsApi } from '@/lib/api';
-import { MOCK_ASSETS, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Asset } from '@/types';
@@ -38,18 +37,9 @@ export default function AssetsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['assets', page, pageSize, search],
-    queryFn: async () => {
-      try {
-        return await assetsApi.list({ page: page + 1, page_size: pageSize, search });
-      } catch {
-        const filtered = search
-          ? MOCK_ASSETS.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
-          : MOCK_ASSETS;
-        return paginate(filtered, page + 1, pageSize);
-      }
-    },
+    queryFn: () => assetsApi.list({ page: page + 1, page_size: pageSize, search }),
   });
 
   return (
@@ -59,6 +49,11 @@ export default function AssetsPage() {
         subtitle="Manage and monitor your infrastructure inventory"
         action={<Button variant="contained" startIcon={<Add />}>Add Asset</Button>}
       />
+      {isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error instanceof Error ? error.message : 'Failed to load assets'}
+        </Alert>
+      )}
       <DataTable
         columns={columns}
         data={data?.items ?? []}

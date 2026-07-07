@@ -14,9 +14,15 @@ import {
 import { Save } from '@mui/icons-material';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export default function SettingsPage() {
   const { mode, setMode } = useThemeMode();
+  const { showToast } = useToast();
+
+  const handleSave = () => {
+    showToast('Preferences saved (theme persists automatically)', 'success');
+  };
 
   return (
     <>
@@ -64,7 +70,7 @@ export default function SettingsPage() {
         </Card>
 
         <Box>
-          <Button variant="contained" startIcon={<Save />}>Save Preferences</Button>
+          <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Save Preferences</Button>
         </Box>
       </Box>
     </>

@@ -5,7 +5,6 @@ import { PersonAdd } from '@mui/icons-material';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
-import { MOCK_USERS, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
@@ -38,13 +37,7 @@ function UsersContent() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await usersApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_USERS, page + 1, pageSize);
-      }
-    },
+    queryFn: () => usersApi.list({ page: page + 1, page_size: pageSize }),
   });
 
   return (

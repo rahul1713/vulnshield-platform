@@ -5,6 +5,8 @@ import { PlayArrow, Stop } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { scansApi } from '@/lib/api';
+import { isDemoSession } from '@/lib/api-client-helpers';
+import { waitForDemoScanComplete } from '@/lib/demo-helpers';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CreateScanDialog } from '@/components/scans/CreateScanDialog';
 import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
@@ -43,12 +45,23 @@ export default function ScansPage() {
     refetchInterval: 3000,
   });
 
+  const notifyScanComplete = async (scanId: string, scanName: string) => {
+    if (isDemoSession()) {
+      const ready = await waitForDemoScanComplete(scanId);
+      if (!ready) {
+        showToast('Scan is still running — PDF will be available shortly', 'info');
+        return;
+      }
+    }
+    showToast(`Scan "${scanName}" completed — executive PDF ready`, 'success');
+    queryClient.invalidateQueries({ queryKey: ['scans'] });
+    queryClient.invalidateQueries({ queryKey: ['reports'] });
+  };
+
   const startMutation = useMutation({
     mutationFn: (id: string) => scansApi.start(id),
-    onSuccess: () => {
-      showToast('Scan completed — executive PDF report available', 'success');
-      queryClient.invalidateQueries({ queryKey: ['scans'] });
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
+    onSuccess: async (scan) => {
+      await notifyScanComplete(scan.id, scan.name);
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
@@ -67,10 +80,8 @@ export default function ScansPage() {
       showToast(`Scan "${scan.name}" created`, 'success');
       await refetch();
       if (scan.id) {
-        await scansApi.start(scan.id);
-        showToast('Scan finished — download executive PDF from Actions', 'success');
-        await refetch();
-        queryClient.invalidateQueries({ queryKey: ['reports'] });
+        const started = await scansApi.start(scan.id);
+        await notifyScanComplete(started.id, started.name);
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to create scan', 'error');

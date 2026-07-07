@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { auditApi } from '@/lib/api';
-import { MOCK_AUDIT_LOGS, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
@@ -24,13 +23,7 @@ function AuditLogsContent() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit-logs', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await auditApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_AUDIT_LOGS, page + 1, pageSize);
-      }
-    },
+    queryFn: () => auditApi.list({ page: page + 1, page_size: pageSize }),
   });
 
   return (

@@ -35,14 +35,12 @@ export default function ReportsPage() {
   const handleExecutiveReport = async () => {
     try {
       if (isDemoSession()) {
-        const inputs = Object.values(
-          JSON.parse(sessionStorage.getItem('vulnshield_demo_report_inputs') || '{}')
-        );
+        const inputs = Object.values(readMapInputs());
         if (!inputs.length) {
           showToast('Run a scan or review first to generate data', 'warning');
           return;
         }
-        const blob = generateExecutivePdf(inputs[0] as Parameters<typeof generateExecutivePdf>[0]);
+        const blob = await generateExecutivePdf(inputs[0]);
         downloadPdfBlob(blob, 'vulnshield-executive-summary.pdf');
       } else {
         const report = await reportsApi.generate({
@@ -61,12 +59,19 @@ export default function ReportsPage() {
 
   const downloadRow = async (row: Report) => {
     try {
+      if (row.format !== 'pdf') {
+        showToast('Only PDF reports can be downloaded from this view', 'warning');
+        return;
+      }
       if (isDemoSession()) {
-        const map = JSON.parse(sessionStorage.getItem('vulnshield_demo_report_inputs') || '{}');
-        const first = Object.values(map)[0];
-        if (first) {
-          downloadPdfBlob(generateExecutivePdf(first as Parameters<typeof generateExecutivePdf>[0]), `${row.name}.pdf`);
+        const { demoStore } = await import('@/lib/demo-store');
+        const entityKey = row.source_entity_key || demoStore.getReportEntityKey(row.id);
+        const input = entityKey ? demoStore.getReportInput(entityKey) : undefined;
+        if (!input) {
+          showToast('PDF data not available for this report', 'warning');
+          return;
         }
+        downloadPdfBlob(await generateExecutivePdf(input), `${row.name}.pdf`);
       } else {
         await reportsApi.download(row.id, `${row.name}.pdf`);
       }
@@ -110,4 +115,13 @@ export default function ReportsPage() {
       />
     </>
   );
+}
+
+function readMapInputs() {
+  try {
+    const raw = sessionStorage.getItem('vulnshield_demo_report_inputs') || '{}';
+    return JSON.parse(raw) as Record<string, Parameters<typeof generateExecutivePdf>[0]>;
+  } catch {
+    return {};
+  }
 }

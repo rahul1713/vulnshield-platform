@@ -1,34 +1,6 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+'use client';
 
-export interface ExecutiveFinding {
-  title: string;
-  severity: string;
-  category?: string;
-  description?: string;
-  remediation?: string;
-  recommended_fix?: string;
-  owasp_category?: string;
-  cwe_id?: string;
-  cvss_score?: number;
-  file_path?: string;
-  line_start?: number;
-  line_end?: number;
-  location?: string;
-  proof?: string;
-  root_cause?: string;
-}
-
-export interface ExecutiveReportInput {
-  reportTitle: string;
-  assessmentType: string;
-  target: string;
-  executiveSummary: string;
-  methodology: string;
-  findings: ExecutiveFinding[];
-  severityCounts?: Record<string, number>;
-  metadata?: Record<string, string>;
-}
+import type { ExecutiveReportInput } from '@/lib/executive-pdf-types';
 
 const SEVERITY_COLORS: Record<string, [number, number, number]> = {
   critical: [220, 38, 38],
@@ -38,7 +10,14 @@ const SEVERITY_COLORS: Record<string, [number, number, number]> = {
   info: [107, 114, 128],
 };
 
-export function generateExecutivePdf(input: ExecutiveReportInput): Blob {
+/** Client-only PDF generation — dynamically imports jspdf to avoid SSR errors. */
+export async function generateExecutivePdf(input: ExecutiveReportInput): Promise<Blob> {
+  const [{ jsPDF }, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+  const autoTable = autoTableModule.default;
+
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const margin = 48;
   let y = margin;
@@ -86,7 +65,7 @@ export function generateExecutivePdf(input: ExecutiveReportInput): Blob {
       styles: { fontSize: 9 },
       headStyles: { fillColor: [14, 116, 144] },
     });
-    y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+    y = (doc as InstanceType<typeof jsPDF> & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
   }
 
   doc.setFontSize(13);
@@ -146,11 +125,7 @@ export function generateExecutivePdf(input: ExecutiveReportInput): Blob {
     doc.setPage(p);
     doc.setFontSize(7);
     doc.setTextColor(156, 163, 175);
-    doc.text(
-      'CONFIDENTIAL — Authorized distribution only | VulnShield Platform',
-      margin,
-      760
-    );
+    doc.text('CONFIDENTIAL — Authorized distribution only | VulnShield Platform', margin, 760);
   }
 
   return doc.output('blob');
@@ -160,7 +135,12 @@ export function downloadPdfBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export type { ExecutiveFinding, ExecutiveReportInput } from '@/lib/executive-pdf-types';

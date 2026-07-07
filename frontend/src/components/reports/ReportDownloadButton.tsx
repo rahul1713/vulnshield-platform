@@ -5,8 +5,8 @@ import { PictureAsPdf } from '@mui/icons-material';
 import { useState } from 'react';
 import { reportsApi } from '@/lib/api';
 import { downloadPdfBlob, ExecutiveReportInput, generateExecutivePdf } from '@/lib/executive-pdf';
-import { demoStore } from '@/lib/demo-store';
 import { isDemoSession } from '@/lib/api-client-helpers';
+import { waitForDemoReportInput } from '@/lib/demo-helpers';
 import { useToast } from '@/components/ui/ToastProvider';
 
 interface ReportDownloadButtonProps {
@@ -15,11 +15,24 @@ interface ReportDownloadButtonProps {
   demoReportKey?: string;
   demoInput?: ExecutiveReportInput;
   reportId?: string;
-  entityType?: 'scan' | 'codereview' | 'redteam';
+  entityType?: 'scan' | 'codereview' | 'redteam' | 'webscan';
   entityId?: string;
   size?: 'small' | 'medium';
   variant?: 'text' | 'outlined' | 'contained';
   disabled?: boolean;
+}
+
+async function resolveDemoInput(
+  demoReportKey?: string,
+  demoInput?: ExecutiveReportInput
+): Promise<ExecutiveReportInput | null> {
+  const { demoStore } = await import('@/lib/demo-store');
+  if (demoInput) return demoInput;
+  if (!demoReportKey) return null;
+  let input = demoStore.getReportInput(demoReportKey);
+  if (input) return input;
+  const ready = await waitForDemoReportInput(demoReportKey);
+  return ready ? demoStore.getReportInput(demoReportKey) ?? null : null;
 }
 
 export function ReportDownloadButton({
@@ -41,27 +54,33 @@ export function ReportDownloadButton({
     setLoading(true);
     try {
       if (isDemoSession()) {
-        let input = demoInput;
-        if (demoReportKey) {
-          input = demoStore.getReportInput(demoReportKey) ?? input;
-        }
+        const input = await resolveDemoInput(demoReportKey, demoInput);
         if (!input) {
-          showToast('Report not ready yet — wait for scan to complete', 'warning');
+          showToast('Report not ready yet — wait for the assessment to complete', 'warning');
           return;
         }
-        const blob = generateExecutivePdf(input);
+        const blob = await generateExecutivePdf(input);
         downloadPdfBlob(blob, filename);
         showToast('Executive PDF downloaded', 'success');
         return;
       }
 
       let id = reportId;
-      if (!id && entityType && entityId) {
+      if (!id && entityType && entityId && entityType !== 'webscan') {
         const created = await reportsApi.generateFromEntity(entityType, entityId);
         id = created.id;
       }
+      if (!id && entityType === 'webscan' && demoReportKey) {
+        const input = await resolveDemoInput(demoReportKey, demoInput);
+        if (input) {
+          const blob = await generateExecutivePdf(input);
+          downloadPdfBlob(blob, filename);
+          showToast('Executive PDF downloaded', 'success');
+          return;
+        }
+      }
       if (!id) {
-        showToast('No report available', 'error');
+        showToast('No report available for this assessment', 'error');
         return;
       }
       await reportsApi.download(id, filename);

@@ -8,7 +8,7 @@ import {
   MOCK_RED_TEAM,
   MOCK_REPORTS,
 } from '@/lib/mock-data';
-import { ExecutiveReportInput } from '@/lib/executive-pdf';
+import { ExecutiveReportInput } from '@/lib/executive-pdf-types';
 import { CodeReview, RedTeamCampaign, Report, Scan, ScanStatus, ScanType, Vulnerability, WebScanFinding } from '@/types';
 
 const KEYS = {
@@ -18,7 +18,9 @@ const KEYS = {
   codeReviews: 'vulnshield_demo_code_reviews',
   redTeam: 'vulnshield_demo_redteam',
   reportInputs: 'vulnshield_demo_report_inputs',
+  reportKeys: 'vulnshield_demo_report_keys',
   reports: 'vulnshield_demo_reports',
+  seeded: 'vulnshield_demo_seeded',
 } as const;
 
 export interface CodeReviewFinding {
@@ -76,6 +78,49 @@ function write<T>(key: string, data: T[]) {
 function writeMap(key: string, data: Record<string, ExecutiveReportInput>) {
   if (typeof window === 'undefined') return;
   sessionStorage.setItem(key, JSON.stringify(data));
+}
+
+function readReportKeys(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem(KEYS.reportKeys);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeReportKeys(data: Record<string, string>) {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(KEYS.reportKeys, JSON.stringify(data));
+}
+
+function buildScanReportInput(scan: Scan): ExecutiveReportInput {
+  const vulns = read(KEYS.vulns, MOCK_VULNERABILITIES).slice(0, 15);
+  const findings = vulns.map((v) => ({
+    title: v.title,
+    severity: v.severity,
+    category: 'Vulnerability',
+    description: v.description,
+    remediation: v.remediation || 'Apply vendor patch and verify remediation.',
+    cwe_id: v.cve_identifier,
+    cvss_score: v.cvss_score,
+  }));
+  return {
+    reportTitle: `Vulnerability Scan — ${scan.name}`,
+    assessmentType: 'Vulnerability Assessment',
+    target: scan.name,
+    executiveSummary: `Scan identified ${scan.findings_count ?? findings.length} findings (${scan.critical_count ?? 0} critical, ${scan.high_count ?? 0} high). Immediate remediation recommended for critical items.`,
+    methodology: 'CVE correlation, CVSS prioritization, configuration assessment, and risk-based triage aligned with industry standards.',
+    findings,
+    severityCounts: {
+      critical: scan.critical_count ?? 0,
+      high: scan.high_count ?? 0,
+      medium: scan.medium_count ?? 0,
+      low: scan.low_count ?? 0,
+      info: scan.info_count ?? 0,
+    },
+  };
 }
 
 function uid() {
@@ -145,8 +190,108 @@ const DEMO_REDTEAM_FINDINGS: Omit<RedTeamFinding, 'id' | 'campaign_id'>[] = [
   },
 ];
 
+function ensureSeedData() {
+  if (typeof window === 'undefined') return;
+  if (sessionStorage.getItem(KEYS.seeded)) return;
+
+  const map = readMap(KEYS.reportInputs);
+  const keys = readReportKeys();
+  let reports = read(KEYS.reports, MOCK_REPORTS);
+
+  MOCK_SCANS.filter((s) => s.status === 'completed').forEach((scan) => {
+    const entityKey = `scan:${scan.id}`;
+    if (!map[entityKey]) map[entityKey] = buildScanReportInput(scan);
+  });
+
+  const seedReview = MOCK_CODE_REVIEWS.find((r) => r.status === 'completed');
+  if (seedReview && !map[`codereview:${seedReview.id}`]) {
+    map[`codereview:${seedReview.id}`] = {
+      reportTitle: `SAST Report — ${seedReview.repository_url}`,
+      assessmentType: 'Application Security Code Review',
+      target: seedReview.repository_url || 'repository',
+      executiveSummary: `Static analysis identified ${seedReview.findings_count} security issues requiring remediation before production release.`,
+      methodology: 'Pattern-based SAST (OWASP, CWE), secrets detection, injection analysis, and insecure API usage checks.',
+      findings: [
+        { title: 'Hardcoded credential', severity: 'critical', category: 'SAST', cwe_id: 'CWE-798', remediation: 'Use secrets manager.' },
+        { title: 'SQL injection risk', severity: 'high', category: 'SAST', cwe_id: 'CWE-89', remediation: 'Use parameterized queries.' },
+      ],
+      severityCounts: { critical: 1, high: 1 },
+    };
+    keys[`review-${seedReview.id}`] = `codereview:${seedReview.id}`;
+  }
+
+  const seedCampaign = MOCK_RED_TEAM.find((c) => c.status === 'completed');
+  if (seedCampaign && !map[`redteam:${seedCampaign.id}`]) {
+    map[`redteam:${seedCampaign.id}`] = {
+      reportTitle: `Red Team Assessment — ${seedCampaign.name}`,
+      assessmentType: 'Adversary Simulation (MITRE ATT&CK)',
+      target: seedCampaign.name,
+      executiveSummary: `Campaign identified ${seedCampaign.findings_count} attack paths including credential exposure and lateral movement.`,
+      methodology: 'MITRE ATT&CK-mapped attack simulation covering initial access through impact phases.',
+      findings: DEMO_REDTEAM_FINDINGS.map((f) => ({
+        title: f.title,
+        severity: f.severity,
+        description: f.description,
+        remediation: f.remediation,
+        proof: f.proof,
+        category: f.mitre_tactic,
+      })),
+      severityCounts: { critical: 1, high: 2 },
+    };
+    keys[`campaign-${seedCampaign.id}`] = `redteam:${seedCampaign.id}`;
+  }
+
+  reports = reports.map((r) => {
+    if (r.source_entity_key) return r;
+    if (r.id === '1') return { ...r, source_entity_key: 'scan:1' };
+    return r;
+  });
+
+  keys['1'] = keys['1'] || 'scan:1';
+
+  if (seedReview) {
+    const reviewReportId = 'review-seed-1';
+    if (!reports.some((r) => r.source_entity_key === `codereview:${seedReview.id}`)) {
+      reports.unshift({
+        id: reviewReportId,
+        name: `Executive Code Review — ${seedReview.language}`,
+        report_type: 'technical',
+        format: 'pdf',
+        status: 'completed',
+        generated_at: seedReview.completed_at,
+        created_at: seedReview.created_at,
+        source_entity_key: `codereview:${seedReview.id}`,
+      });
+      keys[reviewReportId] = `codereview:${seedReview.id}`;
+    }
+  }
+
+  if (seedCampaign) {
+    const campaignReportId = 'campaign-seed-1';
+    if (!reports.some((r) => r.source_entity_key === `redteam:${seedCampaign.id}`)) {
+      reports.unshift({
+        id: campaignReportId,
+        name: `Executive Red Team — ${seedCampaign.name}`,
+        report_type: 'executive',
+        format: 'pdf',
+        status: 'completed',
+        generated_at: seedCampaign.completed_at,
+        created_at: seedCampaign.created_at,
+        source_entity_key: `redteam:${seedCampaign.id}`,
+      });
+      keys[campaignReportId] = `redteam:${seedCampaign.id}`;
+    }
+  }
+
+  writeMap(KEYS.reportInputs, map);
+  writeReportKeys(keys);
+  write(KEYS.reports, reports);
+  sessionStorage.setItem(KEYS.seeded, '1');
+}
+
 export const demoStore = {
   getScans(): Scan[] {
+    ensureSeedData();
     return read(KEYS.scans, MOCK_SCANS);
   },
 
@@ -201,41 +346,18 @@ export const demoStore = {
         info_count: info,
       });
       if (scan) this._saveScanReport(scan);
-    }, 2500);
+    }, 1500);
 
     return started;
   },
 
   _saveScanReport(scan: Scan) {
-    const vulns = this.getVulnerabilities().slice(0, 15);
-    const findings = vulns.map((v) => ({
-      title: v.title,
-      severity: v.severity,
-      category: 'Vulnerability',
-      description: v.description,
-      remediation: v.remediation || 'Apply vendor patch and verify remediation.',
-      cwe_id: v.cve_identifier,
-      cvss_score: v.cvss_score,
-    }));
-    const input: ExecutiveReportInput = {
-      reportTitle: `Vulnerability Scan — ${scan.name}`,
-      assessmentType: 'Vulnerability Assessment',
-      target: scan.name,
-      executiveSummary: `Scan identified ${scan.findings_count} findings (${scan.critical_count} critical, ${scan.high_count} high). Immediate remediation recommended for critical items.`,
-      methodology: 'CVE correlation, CVSS prioritization, configuration assessment, and risk-based triage aligned with industry standards.',
-      findings,
-      severityCounts: {
-        critical: scan.critical_count ?? 0,
-        high: scan.high_count ?? 0,
-        medium: scan.medium_count ?? 0,
-        low: scan.low_count ?? 0,
-        info: scan.info_count ?? 0,
-      },
-    };
+    const entityKey = `scan:${scan.id}`;
+    const input = buildScanReportInput(scan);
     const map = readMap(KEYS.reportInputs);
-    map[`scan:${scan.id}`] = input;
+    map[entityKey] = input;
     writeMap(KEYS.reportInputs, map);
-    this._addReport(`Executive Scan — ${scan.name}`, 'executive', scan.id);
+    this._addReport(`Executive Scan — ${scan.name}`, 'executive', entityKey);
   },
 
   getVulnerabilities(): Vulnerability[] {
@@ -378,8 +500,8 @@ export const demoStore = {
         }, {} as Record<string, number>),
       };
       writeMap(KEYS.reportInputs, map);
-      this._addReport(`Executive Code Review — ${input.language}`, 'technical', review.id);
-    }, 3000);
+      this._addReport(`Executive Code Review — ${input.language}`, 'technical', `codereview:${review.id}`);
+    }, 2000);
 
     return review;
   },
@@ -434,21 +556,31 @@ export const demoStore = {
         severityCounts: { critical: 1, high: 2 },
       };
       writeMap(KEYS.reportInputs, map);
-      this._addReport(`Executive Red Team — ${name}`, 'executive', campaign.id);
-    }, 4000);
+      this._addReport(`Executive Red Team — ${name}`, 'executive', `redteam:${campaign.id}`);
+    }, 2500);
 
     return campaign;
   },
 
   getReportInput(key: string): ExecutiveReportInput | undefined {
+    ensureSeedData();
     return readMap(KEYS.reportInputs)[key];
   },
 
+  getReportEntityKey(reportId: string): string | undefined {
+    ensureSeedData();
+    const keys = readReportKeys();
+    if (keys[reportId]) return keys[reportId];
+    const report = read(KEYS.reports, MOCK_REPORTS).find((r) => r.id === reportId);
+    return report?.source_entity_key;
+  },
+
   getReports(): Report[] {
+    ensureSeedData();
     return read(KEYS.reports, MOCK_REPORTS);
   },
 
-  _addReport(name: string, reportType: Report['report_type'], entityId: string) {
+  _addReport(name: string, reportType: Report['report_type'], entityKey: string) {
     const report: Report = {
       id: uid(),
       name,
@@ -457,8 +589,12 @@ export const demoStore = {
       status: 'completed',
       generated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
+      source_entity_key: entityKey,
     };
-    write(KEYS.reports, [report, ...this.getReports()]);
+    const keys = readReportKeys();
+    keys[report.id] = entityKey;
+    writeReportKeys(keys);
+    write(KEYS.reports, [report, ...read(KEYS.reports, MOCK_REPORTS)]);
     return report;
   },
 };

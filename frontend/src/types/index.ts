@@ -279,6 +279,8 @@ export interface Report {
   generated_by?: string;
   generated_at?: string;
   created_at: string;
+  /** Demo mode: maps report row to executive PDF input key (e.g. scan:abc123). */
+  source_entity_key?: string;
 }
 
 export interface PatchInfo {

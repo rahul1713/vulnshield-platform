@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { riskApi } from '@/lib/api';
-import { MOCK_RISK, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { RiskScore } from '@/types';
@@ -32,13 +31,7 @@ export default function RiskPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['risk', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await riskApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_RISK, page + 1, pageSize);
-      }
-    },
+    queryFn: () => riskApi.list({ page: page + 1, page_size: pageSize }),
   });
 
   return (

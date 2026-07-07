@@ -5,6 +5,8 @@ import { Code } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { codeReviewApi } from '@/lib/api';
+import { isDemoSession } from '@/lib/api-client-helpers';
+import { waitForDemoReportInput } from '@/lib/demo-helpers';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
@@ -55,7 +57,10 @@ export default function CodeReviewPage() {
         file_path: input.file_path,
       });
     },
-    onSuccess: () => {
+    onSuccess: async (review) => {
+      if (isDemoSession()) {
+        await waitForDemoReportInput(`codereview:${review.id}`);
+      }
       showToast('SAST complete — executive PDF report ready', 'success');
       queryClient.invalidateQueries({ queryKey: ['code-review'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });

@@ -4,7 +4,6 @@ import { Chip } from '@mui/material';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { patchApi } from '@/lib/api';
-import { MOCK_PATCHES, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { SeverityChip } from '@/components/ui/SeverityChip';
@@ -37,13 +36,7 @@ export default function PatchIntelligencePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['patch-intelligence', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await patchApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_PATCHES, page + 1, pageSize);
-      }
-    },
+    queryFn: () => patchApi.list({ page: page + 1, page_size: pageSize }),
   });
 
   return (

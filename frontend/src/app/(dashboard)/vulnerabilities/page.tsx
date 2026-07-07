@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Alert } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { vulnerabilitiesApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -28,7 +29,7 @@ export default function VulnerabilitiesPage() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['vulnerabilities', page, pageSize, search],
     queryFn: () => vulnerabilitiesApi.list({ page: page + 1, page_size: pageSize, search }),
   });
@@ -48,6 +49,11 @@ export default function VulnerabilitiesPage() {
         title="Vulnerabilities"
         subtitle="Click a row to view details and update status"
       />
+      {isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error instanceof Error ? error.message : 'Failed to load vulnerabilities'}
+        </Alert>
+      )}
       <DataTable
         columns={columns}
         data={data?.items ?? []}

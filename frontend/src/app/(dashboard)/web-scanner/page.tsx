@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@mui/material';
-import { PlayArrow } from '@mui/icons-material';
+import { Button, IconButton, Stack } from '@mui/material';
+import { PlayArrow, PictureAsPdf } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { webScannerApi } from '@/lib/api';
@@ -11,6 +11,9 @@ import { SeverityChip } from '@/components/ui/SeverityChip';
 import { StartWebScanDialog } from '@/components/web-scanner/StartWebScanDialog';
 import { useToast } from '@/components/ui/ToastProvider';
 import { WebScanFinding } from '@/types';
+import { demoStore } from '@/lib/demo-store';
+import { isDemoSession } from '@/lib/api-client-helpers';
+import { downloadPdfBlob, generateExecutivePdf } from '@/lib/executive-pdf';
 
 const columns: Column<WebScanFinding>[] = [
   { id: 'title', label: 'Finding', sortable: true },
@@ -25,6 +28,7 @@ export default function WebScannerPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [lastScanUrl, setLastScanUrl] = useState('');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -35,22 +39,43 @@ export default function WebScannerPage() {
 
   const scanMutation = useMutation({
     mutationFn: (url: string) => webScannerApi.startScan(url),
-    onSuccess: () => {
-      showToast('Web scan completed — new findings added', 'success');
+    onSuccess: (_, url) => {
+      setLastScanUrl(url);
+      showToast('Web scan complete — download DAST PDF report', 'success');
       queryClient.invalidateQueries({ queryKey: ['web-scanner'] });
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
 
+  const downloadWebReport = () => {
+    const key = `webscan:${lastScanUrl}`;
+    const input = isDemoSession()
+      ? demoStore.getReportInput(key)
+      : undefined;
+    if (!input) {
+      showToast('Run a web scan first', 'warning');
+      return;
+    }
+    downloadPdfBlob(generateExecutivePdf(input), `dast-report.pdf`);
+    showToast('DAST executive PDF downloaded', 'success');
+  };
+
   return (
     <>
       <PageHeader
         title="Web Scanner"
-        subtitle="Dynamic application security testing (DAST) findings"
+        subtitle="DAST with OWASP Top 10 testing and executive PDF reports"
         action={
-          <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setDialogOpen(true)}>
-            Start Web Scan
-          </Button>
+          <Stack direction="row" spacing={1}>
+            {lastScanUrl && (
+              <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={downloadWebReport}>
+                Download PDF
+              </Button>
+            )}
+            <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setDialogOpen(true)}>
+              Start Web Scan
+            </Button>
+          </Stack>
         }
       />
       <DataTable

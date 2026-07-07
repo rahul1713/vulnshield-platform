@@ -221,6 +221,7 @@ export interface WebScanFinding {
   severity: Severity;
   title: string;
   description?: string;
+  remediation?: string;
   created_at: string;
 }
 

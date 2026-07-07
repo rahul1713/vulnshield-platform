@@ -9,8 +9,10 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
 import { CreateRedTeamDialog } from '@/components/red-team/CreateRedTeamDialog';
+import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { useToast } from '@/components/ui/ToastProvider';
 import { RedTeamCampaign } from '@/types';
+import { Stack } from '@mui/material';
 
 const columns: Column<RedTeamCampaign>[] = [
   { id: 'name', label: 'Campaign', sortable: true },
@@ -38,8 +40,9 @@ export default function RedTeamPage() {
     mutationFn: ({ name, description }: { name: string; description: string }) =>
       redTeamApi.create(name, description),
     onSuccess: () => {
-      showToast('Red team campaign launched', 'success');
+      showToast('Campaign complete — executive PDF report ready', 'success');
       queryClient.invalidateQueries({ queryKey: ['red-team'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
@@ -48,7 +51,7 @@ export default function RedTeamPage() {
     <>
       <PageHeader
         title="AI Red Team"
-        subtitle="Automated adversary simulation and attack path analysis"
+        subtitle="MITRE ATT&CK adversary simulation with executive PDF reports"
         action={
           <Button variant="contained" startIcon={<Security />} onClick={() => setDialogOpen(true)}>
             New Campaign
@@ -66,6 +69,19 @@ export default function RedTeamPage() {
         onPageSizeChange={setPageSize}
         searchPlaceholder="Search campaigns..."
         getRowId={(row) => row.id}
+        rowActions={(row) => (
+          <Stack direction="row" justifyContent="flex-end">
+            {row.status === 'completed' && (
+              <ReportDownloadButton
+                filename={`redteam-report-${row.name}.pdf`}
+                demoReportKey={`redteam:${row.id}`}
+                entityType="redteam"
+                entityId={row.id}
+                label="PDF"
+              />
+            )}
+          </Stack>
+        )}
       />
       <CreateRedTeamDialog
         open={dialogOpen}

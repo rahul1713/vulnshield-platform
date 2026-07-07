@@ -319,14 +319,30 @@ export const codeReviewApi = {
       return paginate(demoStore.getCodeReviews(), page, pageSize);
     }
   },
-  create: async (repository_url: string, language: string) => {
+  create: async (payload: {
+    repository_url?: string;
+    language: string;
+    source_code?: string;
+    file_path?: string;
+    branch?: string;
+  }) => {
     if (isDemoSession()) {
-      return demoStore.createCodeReview(repository_url, language);
+      return demoStore.createCodeReview(payload);
     }
-    return request<CodeReview>('/reviews', {
+    return request<CodeReview & { report_id?: string }>('/reviews', {
       method: 'POST',
-      body: JSON.stringify({ repository_url, language, branch: 'main', source_code: '// submitted for review' }),
+      body: JSON.stringify({
+        repository_url: payload.repository_url,
+        language: payload.language,
+        branch: payload.branch || 'main',
+        source_code: payload.source_code,
+        file_path: payload.file_path,
+      }),
     });
+  },
+  getFindings: async (reviewId: string) => {
+    if (isDemoSession()) return [];
+    return request<unknown[]>(`/reviews/${reviewId}/findings`);
   },
 };
 
@@ -383,9 +399,34 @@ export const reportsApi = {
       return normalizePaginated<Report>(data, page, pageSize);
     } catch (err) {
       if (!canUseDemoFallback()) throw err;
-      const { MOCK_REPORTS, paginate } = await import('@/lib/mock-data');
-      return paginate(MOCK_REPORTS, page, pageSize);
+      const { paginate } = await import('@/lib/mock-data');
+      return paginate(demoStore.getReports(), page, pageSize);
     }
+  },
+  generate: async (payload: { name: string; report_type: string; format: string; parameters?: Record<string, unknown> }) => {
+    return request<Report>('/reports', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  generateFromEntity: async (entityType: 'scan' | 'codereview' | 'redteam', entityId: string) => {
+    const paths = {
+      scan: `/reports/from-scan/${entityId}`,
+      codereview: `/reports/from-codereview/${entityId}`,
+      redteam: `/reports/from-redteam/${entityId}`,
+    };
+    return request<Report>(paths[entityType], { method: 'POST' });
+  },
+  download: async (reportId: string, filename: string) => {
+    const token = getStoredToken();
+    const response = await fetch(`${API_URL}/reports/${reportId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new ApiError(response.status, 'Failed to download report');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   },
 };
 

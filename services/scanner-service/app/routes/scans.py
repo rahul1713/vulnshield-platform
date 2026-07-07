@@ -53,9 +53,12 @@ async def update_scan(
 async def start_scan(
     scan_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _: TokenPayload = Depends(require_permission("scans:write")),
+    user: TokenPayload = Depends(require_permission("scans:write")),
 ):
-    return await scan_service.start_scan(db, scan_id)
+    from app.services.scan_executor import execute_scan
+
+    await scan_service.start_scan(db, scan_id)
+    return await execute_scan(db, scan_id, UUID(user.user_id))
 
 
 @router.post("/{scan_id}/cancel", response_model=ScanResponse)

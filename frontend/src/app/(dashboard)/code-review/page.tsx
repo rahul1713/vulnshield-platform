@@ -1,19 +1,21 @@
 'use client';
 
 import { Button } from '@mui/material';
-import { Code, PlayArrow, Security } from '@mui/icons-material';
+import { Code } from '@mui/icons-material';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { codeReviewApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
-import { CreateCodeReviewDialog } from '@/components/code-review/CreateCodeReviewDialog';
+import { CreateCodeReviewDialog, CodeReviewInput } from '@/components/code-review/CreateCodeReviewDialog';
+import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CodeReview } from '@/types';
+import { Stack } from '@mui/material';
 
 const columns: Column<CodeReview>[] = [
-  { id: 'repository_url', label: 'Repository', getValue: (row) => row.repository_url?.replace('https://github.com/', '') || '—' },
+  { id: 'repository_url', label: 'Target', getValue: (row) => row.repository_url?.replace('https://github.com/', '') || '—' },
   { id: 'branch', label: 'Branch' },
   { id: 'language', label: 'Language', getValue: (row) => row.language || '—' },
   { id: 'status', label: 'Status', render: (row) => <StatusChip status={row.status} /> },
@@ -36,11 +38,27 @@ export default function CodeReviewPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: ({ repo, language }: { repo: string; language: string }) =>
-      codeReviewApi.create(repo, language),
+    mutationFn: (input: CodeReviewInput) => {
+      if (input.mode === 'repository') {
+        return codeReviewApi.create({
+          repository_url: input.repository_url,
+          language: input.language,
+          branch: input.branch,
+        });
+      }
+      if (input.mode === 'path') {
+        return codeReviewApi.create({ file_path: input.file_path, language: input.language });
+      }
+      return codeReviewApi.create({
+        source_code: input.source_code,
+        language: input.language,
+        file_path: input.file_path,
+      });
+    },
     onSuccess: () => {
-      showToast('Code review started — results will appear shortly', 'success');
+      showToast('SAST complete — executive PDF report ready', 'success');
       queryClient.invalidateQueries({ queryKey: ['code-review'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
@@ -49,7 +67,7 @@ export default function CodeReviewPage() {
     <>
       <PageHeader
         title="AI Code Review"
-        subtitle="Automated security analysis of source code repositories"
+        subtitle="SAST via repository, file path, or pasted code — executive PDF with remediation"
         action={
           <Button variant="contained" startIcon={<Code />} onClick={() => setDialogOpen(true)}>
             New Review
@@ -67,12 +85,25 @@ export default function CodeReviewPage() {
         onPageSizeChange={setPageSize}
         searchPlaceholder="Search reviews..."
         getRowId={(row) => row.id}
+        rowActions={(row) => (
+          <Stack direction="row" justifyContent="flex-end">
+            {row.status === 'completed' && (
+              <ReportDownloadButton
+                filename={`sast-report-${row.id}.pdf`}
+                demoReportKey={`codereview:${row.id}`}
+                entityType="codereview"
+                entityId={row.id}
+                label="PDF"
+              />
+            )}
+          </Stack>
+        )}
       />
       <CreateCodeReviewDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        onSubmit={async (repo, language) => {
-          await createMutation.mutateAsync({ repo, language });
+        onSubmit={async (input) => {
+          await createMutation.mutateAsync(input);
         }}
       />
     </>

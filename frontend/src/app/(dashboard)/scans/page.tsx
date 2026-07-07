@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { scansApi } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CreateScanDialog } from '@/components/scans/CreateScanDialog';
+import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
@@ -45,8 +46,9 @@ export default function ScansPage() {
   const startMutation = useMutation({
     mutationFn: (id: string) => scansApi.start(id),
     onSuccess: () => {
-      showToast('Scan started successfully', 'success');
+      showToast('Scan completed — executive PDF report available', 'success');
       queryClient.invalidateQueries({ queryKey: ['scans'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (e: Error) => showToast(e.message, 'error'),
   });
@@ -66,8 +68,9 @@ export default function ScansPage() {
       await refetch();
       if (scan.id) {
         await scansApi.start(scan.id);
-        showToast('Scan started', 'success');
+        showToast('Scan finished — download executive PDF from Actions', 'success');
         await refetch();
+        queryClient.invalidateQueries({ queryKey: ['reports'] });
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to create scan', 'error');
@@ -79,7 +82,7 @@ export default function ScansPage() {
     <>
       <PageHeader
         title="Scans"
-        subtitle="Manage vulnerability and compliance scans"
+        subtitle="Vulnerability assessments with executive PDF reports"
         action={
           <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setDialogOpen(true)}>
             New Scan
@@ -98,24 +101,23 @@ export default function ScansPage() {
         searchPlaceholder="Search scans..."
         getRowId={(row) => row.id}
         rowActions={(row) => (
-          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+            {row.status === 'completed' && (
+              <ReportDownloadButton
+                filename={`scan-report-${row.name}.pdf`}
+                demoReportKey={`scan:${row.id}`}
+                entityType="scan"
+                entityId={row.id}
+                label="PDF"
+              />
+            )}
             {(row.status === 'queued' || row.status === 'failed') && (
-              <IconButton
-                size="small"
-                color="primary"
-                title="Start scan"
-                onClick={() => startMutation.mutate(row.id)}
-              >
+              <IconButton size="small" color="primary" title="Start scan" onClick={() => startMutation.mutate(row.id)}>
                 <PlayArrow fontSize="small" />
               </IconButton>
             )}
             {row.status === 'running' && (
-              <IconButton
-                size="small"
-                color="warning"
-                title="Cancel scan"
-                onClick={() => cancelMutation.mutate(row.id)}
-              >
+              <IconButton size="small" color="warning" title="Cancel" onClick={() => cancelMutation.mutate(row.id)}>
                 <Stop fontSize="small" />
               </IconButton>
             )}

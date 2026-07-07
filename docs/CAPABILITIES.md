@@ -163,9 +163,11 @@ open → acknowledged → assigned → in_progress → mitigated → resolved �
 
 | Operation | Location | What happens |
 |-----------|----------|--------------|
-| **Generate report** | Reports page | Create executive, technical, compliance, or trend reports |
-| **Export** | Report actions | Download PDF, Excel, or CSV |
-| **Schedule** | Admin configuration | Automated recurring report delivery (via notification service) |
+| **Auto PDF on scan complete** | Scans → Actions → PDF | Executive report with findings, severity breakdown, remediation |
+| **Auto PDF on SAST complete** | Code Review → PDF | Repo, file path, or pasted code — OWASP/CWE findings |
+| **Auto PDF on red team** | Red Team → PDF | MITRE ATT&CK findings with proof and remediation |
+| **DAST PDF** | Web Scanner → Download PDF | OWASP web findings after active scan |
+| **Reports library** | Reports page | All executive PDFs with download |
 
 ---
 

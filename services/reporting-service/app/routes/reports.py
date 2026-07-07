@@ -7,6 +7,11 @@ from vulnshield_common.database import get_db
 from vulnshield_common.storage import download_file
 from app.schemas import ReportCreate, ReportResponse
 from app.services import report_service
+from vulnshield_common.entity_reports import (
+    generate_codereview_executive_report,
+    generate_redteam_executive_report,
+    generate_scan_executive_report,
+)
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -39,6 +44,39 @@ async def get_report(
     _: TokenPayload = Depends(require_permission("reports:read")),
 ):
     return await report_service.get_report(db, report_id)
+
+
+@router.post("/from-scan/{scan_id}", response_model=ReportResponse, status_code=201)
+async def report_from_scan(
+    scan_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: TokenPayload = Depends(require_permission("reports:write")),
+):
+    from uuid import UUID as U
+
+    return await generate_scan_executive_report(db, scan_id, U(user.user_id))
+
+
+@router.post("/from-codereview/{review_id}", response_model=ReportResponse, status_code=201)
+async def report_from_codereview(
+    review_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: TokenPayload = Depends(require_permission("reports:write")),
+):
+    from uuid import UUID as U
+
+    return await generate_codereview_executive_report(db, review_id, U(user.user_id))
+
+
+@router.post("/from-redteam/{campaign_id}", response_model=ReportResponse, status_code=201)
+async def report_from_redteam(
+    campaign_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: TokenPayload = Depends(require_permission("reports:write")),
+):
+    from uuid import UUID as U
+
+    return await generate_redteam_executive_report(db, campaign_id, U(user.user_id))
 
 
 @router.get("/{report_id}/download")

@@ -5,6 +5,7 @@ import { PersonAdd } from '@mui/icons-material';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
+import { useToast } from '@/components/ui/ToastProvider';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
@@ -34,6 +35,7 @@ const columns: Column<User>[] = [
 function UsersContent() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, pageSize],
@@ -45,7 +47,17 @@ function UsersContent() {
       <PageHeader
         title="Users"
         subtitle="Manage user accounts and role assignments"
-        action={<Button variant="contained" startIcon={<PersonAdd />}>Add User</Button>}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={() =>
+              showToast('User provisioning requires the auth-service API. Run `make up` to start the full stack.', 'info')
+            }
+          >
+            Add User
+          </Button>
+        }
       />
       <DataTable
         columns={columns}

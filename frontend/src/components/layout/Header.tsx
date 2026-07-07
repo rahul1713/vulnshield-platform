@@ -31,6 +31,7 @@ import {
   Search,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/ToastProvider';
 import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@/components/layout/AuthProvider';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
@@ -49,6 +50,7 @@ export function Header({ onMenuClick, sidebarWidth = DRAWER_WIDTH }: HeaderProps
   const { user, logout } = useAuth();
   const { mode, toggleTheme } = useThemeMode();
   const router = useRouter();
+  const { showToast } = useToast();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -144,7 +146,10 @@ export function Header({ onMenuClick, sidebarWidth = DRAWER_WIDTH }: HeaderProps
         </Box>
 
         <Tooltip title="Notifications">
-          <IconButton color="inherit">
+          <IconButton
+            color="inherit"
+            onClick={() => showToast('No new notifications. Connect notification-service for live alerts.', 'info')}
+          >
             <NotificationsNone />
           </IconButton>
         </Tooltip>

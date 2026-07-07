@@ -9,11 +9,12 @@ import React, {
   useState,
 } from 'react';
 import { authApi } from '@/lib/api';
-import { MOCK_ACCESS_TOKEN, mockLogin } from '@/lib/mock-data';
+import { mockLogin } from '@/lib/mock-data';
 import { isDemoModeEnabled } from '@/lib/env';
 import {
   clearStoredAuth,
   getStoredUserRaw,
+  MOCK_ACCESS_TOKEN,
   setStoredAuth,
   TOKEN_KEY,
 } from '@/lib/auth';

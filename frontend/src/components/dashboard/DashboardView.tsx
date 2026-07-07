@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import {
   BugReport,
   CheckCircle,
@@ -44,12 +44,33 @@ async function fetchDashboard(type: 'executive' | 'soc'): Promise<DashboardData>
 }
 
 export function DashboardView({ title, subtitle, fetchKey }: DashboardViewProps) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['dashboard', fetchKey],
     queryFn: () => fetchDashboard(fetchKey),
   });
 
-  const stats = data?.stats ?? MOCK_DASHBOARD.stats;
+  if (isError && !canUseDemoFallback()) {
+    return (
+      <>
+        <PageHeader title={title} subtitle={subtitle} />
+        <Alert severity="error">
+          {error instanceof Error ? error.message : 'Failed to load dashboard data. Ensure the API gateway is running.'}
+        </Alert>
+      </>
+    );
+  }
+
+  const chartData = data ?? (canUseDemoFallback() ? MOCK_DASHBOARD : null);
+  if (!chartData) {
+    return (
+      <>
+        <PageHeader title={title} subtitle={subtitle} />
+        <Alert severity="warning">Dashboard data unavailable.</Alert>
+      </>
+    );
+  }
+
+  const stats = chartData.stats;
 
   return (
     <>
@@ -139,19 +160,19 @@ export function DashboardView({ title, subtitle, fetchKey }: DashboardViewProps)
         }}
       >
         <Box sx={{ gridColumn: { md: 'span 1' } }}>
-          <SeverityDistributionChart data={data?.severity_distribution ?? MOCK_DASHBOARD.severity_distribution} />
+          <SeverityDistributionChart data={chartData.severity_distribution} />
         </Box>
         <Box sx={{ gridColumn: { md: 'span 1', xl: 'span 2' } }}>
-          <RiskTrendChart data={data?.risk_trends ?? MOCK_DASHBOARD.risk_trends} />
+          <RiskTrendChart data={chartData.risk_trends} />
         </Box>
         <Box sx={{ gridColumn: { md: 'span 1' } }}>
-          <RemediationProgressChart data={data?.remediation_progress ?? MOCK_DASHBOARD.remediation_progress} />
+          <RemediationProgressChart data={chartData.remediation_progress} />
         </Box>
         <Box sx={{ gridColumn: { md: 'span 1' } }}>
-          <RiskHeatmapChart data={data?.risk_heatmap ?? MOCK_DASHBOARD.risk_heatmap} />
+          <RiskHeatmapChart data={chartData.risk_heatmap} />
         </Box>
         <Box sx={{ gridColumn: { md: 'span 1' } }}>
-          <ComplianceScoreChart data={data?.compliance_scores ?? MOCK_DASHBOARD.compliance_scores} />
+          <ComplianceScoreChart data={chartData.compliance_scores} />
         </Box>
       </Box>
     </>

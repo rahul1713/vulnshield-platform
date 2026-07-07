@@ -4,6 +4,7 @@ import { Button, Chip, Alert } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { assetsApi } from '@/lib/api';
+import { useToast } from '@/components/ui/ToastProvider';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Asset } from '@/types';
@@ -36,6 +37,7 @@ export default function AssetsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const { showToast } = useToast();
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['assets', page, pageSize, search],
@@ -47,7 +49,17 @@ export default function AssetsPage() {
       <PageHeader
         title="Assets"
         subtitle="Manage and monitor your infrastructure inventory"
-        action={<Button variant="contained" startIcon={<Add />}>Add Asset</Button>}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() =>
+              showToast('Asset creation requires the asset-service API. Run `make up` to start the full stack.', 'info')
+            }
+          >
+            Add Asset
+          </Button>
+        }
       />
       {isError && (
         <Alert severity="error" sx={{ mb: 2 }}>

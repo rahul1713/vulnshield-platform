@@ -15,6 +15,7 @@ import {
   Vulnerability,
   WebScanFinding,
 } from '@/types';
+import { MOCK_ACCESS_TOKEN } from '@/lib/auth';
 
 export const MOCK_DASHBOARD: DashboardData = {
   stats: {
@@ -115,8 +116,6 @@ export const MOCK_USERS: User[] = [
   { id: '1', email: 'admin@vulnshield.local', username: 'admin', first_name: 'System', last_name: 'Administrator', role: 'administrator', permissions: ['*'], is_active: true, last_login: '2024-06-05T08:00:00Z' },
   { id: '2', email: 'soc@vulnshield.local', username: 'soc_analyst', first_name: 'Jane', last_name: 'Smith', role: 'soc_analyst', permissions: ['assets:read', 'vulnerabilities:read', 'dashboard:read'], is_active: true },
 ];
-
-export const MOCK_ACCESS_TOKEN = 'mock-demo-access-token';
 
 /** Offline demo login — only when NEXT_PUBLIC_ENABLE_DEMO_MODE=true and credentials are set in .env.local */
 export function mockLogin(username: string, password: string) {

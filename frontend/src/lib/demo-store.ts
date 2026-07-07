@@ -205,7 +205,8 @@ function ensureSeedData() {
 
   const seedReview = MOCK_CODE_REVIEWS.find((r) => r.status === 'completed');
   if (seedReview && !map[`codereview:${seedReview.id}`]) {
-    map[`codereview:${seedReview.id}`] = {
+    const reviewKey = `codereview:${seedReview.id}`;
+    map[reviewKey] = {
       reportTitle: `SAST Report — ${seedReview.repository_url}`,
       assessmentType: 'Application Security Code Review',
       target: seedReview.repository_url || 'repository',
@@ -217,12 +218,25 @@ function ensureSeedData() {
       ],
       severityCounts: { critical: 1, high: 1 },
     };
-    keys[`review-${seedReview.id}`] = `codereview:${seedReview.id}`;
+    keys[`seed-review-${seedReview.id}`] = reviewKey;
+    if (!reports.some((r) => r.source_entity_key === reviewKey)) {
+      reports = [{
+        id: `seed-review-${seedReview.id}`,
+        name: `Executive Code Review — ${seedReview.language}`,
+        report_type: 'technical',
+        format: 'pdf',
+        status: 'completed',
+        generated_at: seedReview.completed_at,
+        created_at: seedReview.created_at,
+        source_entity_key: reviewKey,
+      }, ...reports];
+    }
   }
 
   const seedCampaign = MOCK_RED_TEAM.find((c) => c.status === 'completed');
   if (seedCampaign && !map[`redteam:${seedCampaign.id}`]) {
-    map[`redteam:${seedCampaign.id}`] = {
+    const campaignKey = `redteam:${seedCampaign.id}`;
+    map[campaignKey] = {
       reportTitle: `Red Team Assessment — ${seedCampaign.name}`,
       assessmentType: 'Adversary Simulation (MITRE ATT&CK)',
       target: seedCampaign.name,
@@ -238,7 +252,19 @@ function ensureSeedData() {
       })),
       severityCounts: { critical: 1, high: 2 },
     };
-    keys[`campaign-${seedCampaign.id}`] = `redteam:${seedCampaign.id}`;
+    keys[`seed-campaign-${seedCampaign.id}`] = campaignKey;
+    if (!reports.some((r) => r.source_entity_key === campaignKey)) {
+      reports = [{
+        id: `seed-campaign-${seedCampaign.id}`,
+        name: `Executive Red Team — ${seedCampaign.name}`,
+        report_type: 'executive',
+        format: 'pdf',
+        status: 'completed',
+        generated_at: seedCampaign.completed_at,
+        created_at: seedCampaign.created_at,
+        source_entity_key: campaignKey,
+      }, ...reports];
+    }
   }
 
   reports = reports.map((r) => {

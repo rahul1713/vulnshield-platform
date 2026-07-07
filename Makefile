@@ -1,9 +1,12 @@
-.PHONY: help up down build logs migrate seed test lint clean
+.PHONY: help up down build logs migrate seed test lint clean sandbox-env sandbox-up sandbox-down
 
 help:
 	@echo "VulnShield Platform - Available Commands"
-	@echo "  make up       - Start all services"
-	@echo "  make down     - Stop all services"
+	@echo "  make up            - Start all services (development)"
+	@echo "  make sandbox-env   - Generate .env.sandbox with random secrets"
+	@echo "  make sandbox-up    - Start hardened sandbox deployment"
+	@echo "  make sandbox-down  - Stop sandbox deployment"
+	@echo "  make down          - Stop all services"
 	@echo "  make build    - Build all Docker images"
 	@echo "  make logs     - Tail service logs"
 	@echo "  make migrate  - Run database migrations"
@@ -14,6 +17,15 @@ help:
 
 up:
 	docker compose up -d
+
+sandbox-env:
+	./scripts/generate-sandbox-env.sh .env.sandbox
+
+sandbox-up:
+	docker compose --env-file .env.sandbox -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build
+
+sandbox-down:
+	docker compose --env-file .env.sandbox -f docker-compose.yml -f docker-compose.sandbox.yml down
 
 down:
 	docker compose down

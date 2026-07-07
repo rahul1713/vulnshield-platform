@@ -1,14 +1,15 @@
 'use client';
 
 import { Button } from '@mui/material';
-import { Code } from '@mui/icons-material';
+import { Code, PlayArrow, Security } from '@mui/icons-material';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { codeReviewApi } from '@/lib/api';
-import { MOCK_CODE_REVIEWS, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
+import { CreateCodeReviewDialog } from '@/components/code-review/CreateCodeReviewDialog';
+import { useToast } from '@/components/ui/ToastProvider';
 import { CodeReview } from '@/types';
 
 const columns: Column<CodeReview>[] = [
@@ -24,16 +25,24 @@ const columns: Column<CodeReview>[] = [
 export default function CodeReviewPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ['code-review', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await codeReviewApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_CODE_REVIEWS, page + 1, pageSize);
-      }
+    queryFn: () => codeReviewApi.list({ page: page + 1, page_size: pageSize }),
+    refetchInterval: 3000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: ({ repo, language }: { repo: string; language: string }) =>
+      codeReviewApi.create(repo, language),
+    onSuccess: () => {
+      showToast('Code review started — results will appear shortly', 'success');
+      queryClient.invalidateQueries({ queryKey: ['code-review'] });
     },
+    onError: (e: Error) => showToast(e.message, 'error'),
   });
 
   return (
@@ -41,7 +50,11 @@ export default function CodeReviewPage() {
       <PageHeader
         title="AI Code Review"
         subtitle="Automated security analysis of source code repositories"
-        action={<Button variant="contained" startIcon={<Code />}>New Review</Button>}
+        action={
+          <Button variant="contained" startIcon={<Code />} onClick={() => setDialogOpen(true)}>
+            New Review
+          </Button>
+        }
       />
       <DataTable
         columns={columns}
@@ -54,6 +67,13 @@ export default function CodeReviewPage() {
         onPageSizeChange={setPageSize}
         searchPlaceholder="Search reviews..."
         getRowId={(row) => row.id}
+      />
+      <CreateCodeReviewDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={async (repo, language) => {
+          await createMutation.mutateAsync({ repo, language });
+        }}
       />
     </>
   );

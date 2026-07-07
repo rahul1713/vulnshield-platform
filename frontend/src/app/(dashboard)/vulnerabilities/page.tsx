@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { vulnerabilitiesApi } from '@/lib/api';
-import { MOCK_VULNERABILITIES, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { SeverityChip, StatusChip } from '@/components/ui/SeverityChip';
-import { Vulnerability } from '@/types';
+import { VulnDetailDrawer } from '@/components/vulnerabilities/VulnDetailDrawer';
+import { useToast } from '@/components/ui/ToastProvider';
+import { Vulnerability, VulnStatus } from '@/types';
 
 const columns: Column<Vulnerability>[] = [
   { id: 'title', label: 'Title', sortable: true },
@@ -17,31 +18,36 @@ const columns: Column<Vulnerability>[] = [
   { id: 'cvss_score', label: 'CVSS', getValue: (row) => row.cvss_score?.toFixed(1) ?? '—' },
   { id: 'status', label: 'Status', render: (row) => <StatusChip status={row.status} /> },
   { id: 'risk_score', label: 'Risk', getValue: (row) => row.risk_score?.toFixed(1) ?? '—' },
-  { id: 'first_detected', label: 'Detected', getValue: (row) => new Date(row.first_detected).toLocaleDateString() },
 ];
 
 export default function VulnerabilitiesPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Vulnerability | null>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ['vulnerabilities', page, pageSize, search],
-    queryFn: async () => {
-      try {
-        return await vulnerabilitiesApi.list({ page: page + 1, page_size: pageSize, search });
-      } catch {
-        const filtered = search
-          ? MOCK_VULNERABILITIES.filter((v) => v.title.toLowerCase().includes(search.toLowerCase()))
-          : MOCK_VULNERABILITIES;
-        return paginate(filtered, page + 1, pageSize);
-      }
+    queryFn: () => vulnerabilitiesApi.list({ page: page + 1, page_size: pageSize, search }),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: VulnStatus }) =>
+      vulnerabilitiesApi.updateStatus(id, status),
+    onSuccess: () => {
+      showToast('Vulnerability status updated', 'success');
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
     },
   });
 
   return (
     <>
-      <PageHeader title="Vulnerabilities" subtitle="Track and remediate security findings across your environment" />
+      <PageHeader
+        title="Vulnerabilities"
+        subtitle="Click a row to view details and update status"
+      />
       <DataTable
         columns={columns}
         data={data?.items ?? []}
@@ -52,21 +58,18 @@ export default function VulnerabilitiesPage() {
         onPageChange={setPage}
         onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
         onSearchChange={(q) => { setSearch(q); setPage(0); }}
+        onRowClick={(row) => setSelected(row)}
         searchPlaceholder="Search vulnerabilities..."
-        filters={[
-          { id: 'severity', label: 'All Severities', options: [
-            { value: 'critical', label: 'Critical' },
-            { value: 'high', label: 'High' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'low', label: 'Low' },
-          ]},
-          { id: 'status', label: 'All Statuses', options: [
-            { value: 'open', label: 'Open' },
-            { value: 'in_progress', label: 'In Progress' },
-            { value: 'resolved', label: 'Resolved' },
-          ]},
-        ]}
         getRowId={(row) => row.id}
+      />
+      <VulnDetailDrawer
+        vuln={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        onStatusChange={async (id, status) => {
+          await statusMutation.mutateAsync({ id, status });
+          setSelected((prev) => (prev ? { ...prev, status } : null));
+        }}
       />
     </>
   );

@@ -1,6 +1,10 @@
 # VulnShield Administrator Manual
 
-Guide for platform administrators managing VulnShield deployment, users, agents, and integrations.
+Guide for platform administrators managing deployment, users, agents, and integrations.
+
+![Architecture overview](images/architecture-overview.png)
+
+For deployment procedures see [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md) and [INSTALLATION.md](INSTALLATION.md).
 
 ## Administrator Responsibilities
 

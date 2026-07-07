@@ -1,6 +1,6 @@
 -- VulnShield Platform - Seed Data
 
--- Roles with RBAC permissions
+-- Roles with RBAC permissions (no default admin user — created via INIT_ADMIN_PASSWORD at auth-service startup)
 INSERT INTO roles (id, name, description, permissions) VALUES
 ('a0000000-0000-0000-0000-000000000001', 'administrator', 'Full system access',
  '["*"]'),
@@ -14,12 +14,6 @@ INSERT INTO roles (id, name, description, permissions) VALUES
  '["assets:read","vulnerabilities:read","reports:read","compliance:read","audit:read","dashboard:read"]'),
 ('a0000000-0000-0000-0000-000000000006', 'read_only', 'Read-only access',
  '["assets:read","vulnerabilities:read","reports:read","dashboard:read"]');
-
--- Default admin user (password: Admin@123456)
-INSERT INTO users (id, email, username, password_hash, first_name, last_name, role_id) VALUES
-('b0000000-0000-0000-0000-000000000001', 'admin@vulnshield.local', 'admin',
- '$2b$12$ORFKf7s9wOT2gUlGjz7p7eJ1DSexu/lIjQWDnPMJk9zfftR01MCE6', 'System', 'Administrator',
- 'a0000000-0000-0000-0000-000000000001');
 
 -- Sample CVEs
 INSERT INTO cves (cve_id, description, cvss_v3_score, cvss_v3_vector, epss_score, is_kev, published_date, cwe_ids, cpes) VALUES

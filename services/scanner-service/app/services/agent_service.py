@@ -74,10 +74,24 @@ async def heartbeat(db: AsyncSession, data: dict):
 
 
 def verify_mtls(request: Request, expected_fingerprint: str | None) -> bool:
-    """Validate client certificate fingerprint when mTLS headers are present."""
+    """Validate client certificate fingerprint. Fails closed in sandbox/production."""
+    from vulnshield_common.config import get_settings
+    from vulnshield_common.security import is_protected_environment
+
+    settings = get_settings()
+    if is_protected_environment(settings.environment):
+        if not expected_fingerprint:
+            return False
+        client_fp = request.headers.get("X-Client-Cert-Fingerprint") or request.headers.get(
+            "X-SSL-Client-Fingerprint"
+        )
+        return bool(client_fp and client_fp.lower() == expected_fingerprint.lower())
+
     if not expected_fingerprint:
         return True
-    client_fp = request.headers.get("X-Client-Cert-Fingerprint") or request.headers.get("X-SSL-Client-Fingerprint")
+    client_fp = request.headers.get("X-Client-Cert-Fingerprint") or request.headers.get(
+        "X-SSL-Client-Fingerprint"
+    )
     if not client_fp:
         return request.headers.get("X-MTLS-Optional", "").lower() == "true"
     return client_fp.lower() == expected_fingerprint.lower()

@@ -116,6 +116,25 @@ export const MOCK_USERS: User[] = [
   { id: '2', email: 'soc@vulnshield.local', username: 'soc_analyst', first_name: 'Jane', last_name: 'Smith', role: 'soc_analyst', permissions: ['assets:read', 'vulnerabilities:read', 'dashboard:read'], is_active: true },
 ];
 
+export const MOCK_ACCESS_TOKEN = 'mock-demo-access-token';
+
+/** Offline demo login — only when NEXT_PUBLIC_ENABLE_DEMO_MODE=true and credentials are set in .env.local */
+export function mockLogin(username: string, password: string) {
+  const demoUser = process.env.NEXT_PUBLIC_DEMO_USERNAME ?? '';
+  const demoPass = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? '';
+  if (!demoUser || !demoPass) return null;
+  if (username === demoUser && password === demoPass) {
+    return {
+      access_token: MOCK_ACCESS_TOKEN,
+      refresh_token: 'mock-demo-refresh-token',
+      token_type: 'bearer',
+      expires_in: 3600,
+      user: MOCK_USERS[0],
+    };
+  }
+  return null;
+}
+
 export const MOCK_AUDIT_LOGS: AuditLog[] = [
   { id: '1', user_email: 'admin@vulnshield.local', action: 'user.login', resource_type: 'user', ip_address: '192.168.1.100', created_at: '2024-06-05T08:00:00Z' },
   { id: '2', user_email: 'soc@vulnshield.local', action: 'vulnerability.update', resource_type: 'vulnerability', resource_id: '2', details: { status: 'in_progress' }, created_at: '2024-06-05T09:15:00Z' },

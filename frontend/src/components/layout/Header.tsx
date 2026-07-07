@@ -35,6 +35,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@/components/layout/AuthProvider';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
 import { searchApi } from '@/lib/api';
+import { isDemoModeEnabled } from '@/lib/env';
 import { MOCK_SEARCH } from '@/lib/mock-data';
 import { SearchResult } from '@/types';
 import { DRAWER_WIDTH } from '@/lib/theme';
@@ -67,6 +68,11 @@ export function Header({ onMenuClick, sidebarWidth = DRAWER_WIDTH }: HeaderProps
       const results = await searchApi.search(query);
       setSearchResults(results);
     } catch {
+      if (!isDemoModeEnabled()) {
+        setSearchResults([]);
+        setSearchOpen(false);
+        return;
+      }
       const filtered = MOCK_SEARCH.filter(
         (r) =>
           r.title.toLowerCase().includes(query.toLowerCase()) ||

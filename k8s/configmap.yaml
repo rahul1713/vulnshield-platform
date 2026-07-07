@@ -4,7 +4,7 @@ metadata:
   name: vulnshield-config
   namespace: vulnshield
 data:
-  ENVIRONMENT: "production"
+  ENVIRONMENT: "sandbox"
   LOG_LEVEL: "INFO"
   POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
@@ -21,19 +21,11 @@ data:
   MINIO_USE_SSL: "false"
   LLM_PROVIDER: "ollama"
   OLLAMA_BASE_URL: "http://ollama:11434"
-  OLLAMA_MODEL: "llama3.2"
-  NEXT_PUBLIC_API_URL: "http://api-gateway:8080/api/v1"
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: vulnshield-secrets
-  namespace: vulnshield
-type: Opaque
-stringData:
-  POSTGRES_PASSWORD: "change-me-in-production"
-  RABBITMQ_PASSWORD: "change-me-in-production"
-  JWT_SECRET: "change-me-jwt-secret-key-min-32-chars"
-  MINIO_ACCESS_KEY: "vulnshield_minio"
-  MINIO_SECRET_KEY: "change-me-minio-secret"
+  OLLAMA_MODEL: "qwen3.6"
+  AI_SECURITY_LOCAL_ONLY: "true"
+  AI_SECURITY_ALLOWED_MODELS: "qwen3.6"
+  # Browser-facing API URL — MUST be your public ingress hostname, not cluster DNS
+  CORS_ORIGINS: "https://vulnshield-sandbox.example.com"
+  NEXT_PUBLIC_API_URL: "https://vulnshield-sandbox.example.com/api/v1"
+  NEXT_PUBLIC_DEPLOY_ENV: "sandbox"
+  NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"

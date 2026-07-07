@@ -1,272 +1,247 @@
-# VulnShield Platform Installation Guide
+# VulnShield Installation Guide
 
-Step-by-step instructions for installing VulnShield on a fresh server.
+Step-by-step installation for enterprise deployment including agents, LDAP, mTLS, and Kubernetes.
 
-## System Requirements
+![Deployment flow](images/deployment-flow.png)
 
-### Server (Platform)
+> **Quick start?** For most teams, [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md) (`make sandbox-env && make sandbox-up`) is faster and already hardened.
+
+---
+
+## System requirements
+
+### Platform server
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
 | CPU | 4 cores | 8+ cores |
 | RAM | 16 GB | 32 GB |
 | Disk | 50 GB SSD | 200 GB SSD |
-| OS | Ubuntu 22.04 LTS, RHEL 9, macOS 14+ | Ubuntu 22.04 LTS |
+| OS | Ubuntu 22.04, RHEL 9, macOS 14+ | Ubuntu 22.04 LTS |
 
-### Endpoint Agents
+### Endpoint agents
 
 | Platform | Requirements |
 |----------|-------------|
-| Linux | Python 3.12+, root or CAP_SYS_PTRACE for full collection |
-| Windows | Windows Server 2016+, Python 3.12+, PowerShell 5.1+, Administrator |
+| Linux | Python 3.12+, root or CAP_SYS_PTRACE |
+| Windows | Server 2016+, Python 3.12+, PowerShell 5.1+, Administrator |
+
+---
 
 ## Step 1: Install Docker
 
 ### Ubuntu/Debian
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
+sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo usermod -aG docker $USER
 ```
 
 ### macOS
 
-Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and ensure it is running.
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-## Step 2: Clone and Configure
+---
+
+## Step 2: Clone and configure secrets
 
 ```bash
-git clone https://github.com/your-org/vulnshield-platform.git
+git clone https://github.com/rahul1713/vulnshield-platform.git
 cd vulnshield-platform
+```
+
+### Option A — Sandbox (recommended)
+
+```bash
+make sandbox-env    # Creates .env.sandbox with random secrets
+make sandbox-up
+```
+
+Save the admin password printed by `make sandbox-env`.
+
+### Option B — Custom development
+
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set production values:
+Generate and set secrets:
 
 ```bash
-# Generate a secure JWT secret
-openssl rand -hex 32
-
-# Set in .env
-JWT_SECRET=<generated-value>
-POSTGRES_PASSWORD=<strong-password>
-RABBITMQ_PASSWORD=<strong-password>
-MINIO_SECRET_KEY=<strong-password>
+openssl rand -hex 32   # JWT_SECRET
+openssl rand -hex 24   # POSTGRES_PASSWORD, RABBITMQ_PASSWORD, REDIS_PASSWORD
 ```
-
-## Step 3: Build and Start
-
-```bash
-# Build all Docker images
-make build
-
-# Start the platform
-make up
-
-# Verify all services are healthy
-docker compose ps
-```
-
-Expected output: all services showing `running` or `healthy` status.
-
-## Step 4: Verify Installation
-
-1. Open http://localhost:3000 in your browser
-2. Log in with `admin@vulnshield.local` / `Admin@123456`
-3. Change the default password immediately (Settings → Profile)
-4. Verify the dashboard loads asset and vulnerability data from seed records
-
-Test the API:
-
-```bash
-curl -s http://localhost:8080/api/v1/health | jq .
-```
-
-## Step 5: Pull Qwen 3.6 Model (Required for AI Features)
-
-Security AI features (vulnerability scanning, code review, red teaming) use **local Ollama with Qwen 3.6 only**. Cloud providers (OpenAI, Anthropic, Claude) are not supported for these workloads.
-
-After the stack is running, pull the model:
-
-```bash
-docker compose exec ollama ollama pull qwen3.6
-```
-
-For a lighter variant on limited hardware:
-
-```bash
-docker compose exec ollama ollama pull qwen3.6:27b
-```
-
-Verify LLM connectivity:
-
-```bash
-curl -s http://localhost:11434/api/tags | jq .
-```
-
-Restart AI services after the model is available:
-
-```bash
-docker compose up -d scanner-service ai-code-review ai-redteam
-```
-
-## Step 6: Configure Notifications (Optional)
 
 Edit `.env`:
 
 ```bash
-SMTP_HOST=smtp.yourcompany.com
-SMTP_PORT=587
-SMTP_USER=alerts@yourcompany.com
-SMTP_PASSWORD=your-smtp-password
-SMTP_FROM=noreply@vulnshield.local
-
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/XXXX
+JWT_SECRET=<generated>
+INIT_ADMIN_PASSWORD=<strong-password-12+-chars>
+POSTGRES_PASSWORD=<generated>
+RABBITMQ_PASSWORD=<generated>
+REDIS_PASSWORD=<generated>
+CORS_ORIGINS=https://vulnshield.yourcompany.com
 ```
 
-Restart the notification service:
+---
+
+## Step 3: Build and start
 
 ```bash
-docker compose up -d notification-service
+make build
+make up          # or: make sandbox-up
+docker compose ps
 ```
 
-## Step 7: Install Endpoint Agents
+All services should show `running` or `healthy`.
 
-### Linux Server
+---
+
+## Step 4: Verify installation
+
+1. Open http://localhost:3000 (or your configured URL)
+2. Log in with admin credentials from `INIT_ADMIN_PASSWORD`
+3. Change password when prompted (`must_change_password` flag)
+4. Verify dashboard loads with seed asset and CVE data
 
 ```bash
-# On the target Linux server
-sudo mkdir -p /opt/vulnshield-agent /etc/vulnshield/certs
+curl -s http://localhost:8080/health
+curl -s http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"YOUR_PASSWORD"}'
+```
 
-# Copy agent files from the platform server
-scp -r user@platform-server:/path/to/vulnshield-platform/agents/linux/* /opt/vulnshield-agent/
+---
 
-# Install dependencies
+## Step 5: AI model (optional)
+
+Security AI uses **local Ollama + Qwen 3.6 only**:
+
+```bash
+docker compose --profile ai up -d ollama
+docker compose exec ollama ollama pull qwen3.6
+docker compose up -d scanner-service ai-code-review ai-redteam
+curl -s http://localhost:11434/api/tags
+```
+
+---
+
+## Step 6: Install endpoint agents
+
+### Linux (systemd)
+
+```bash
+sudo mkdir -p /opt/vulnshield-agent /etc/vulnshield
+# Copy agents/linux/* to /opt/vulnshield-agent/
 sudo pip3 install -r /opt/vulnshield-agent/requirements.txt
 
-# Configure
 sudo tee /etc/vulnshield/agent.env << 'EOF'
 VULNSHIELD_API_URL=https://your-platform:8080/api/v1
 VULNSHIELD_API_TOKEN=<token-from-admin-console>
 VULNSHIELD_MTLS_ENABLED=false
 VULNSHIELD_HEARTBEAT_INTERVAL=300
-VULNSHIELD_INVENTORY_INTERVAL=3600
 EOF
 
-# Test collection locally
-sudo python3 /opt/vulnshield-agent/agent.py collect | head -20
-
-# Run as systemd service
-sudo tee /etc/systemd/system/vulnshield-agent.service << 'EOF'
-[Unit]
-Description=VulnShield Linux Agent
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /opt/vulnshield-agent/agent.py
-EnvironmentFile=/etc/vulnshield/agent.env
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
 sudo systemctl enable --now vulnshield-agent
 ```
 
-### Windows Server
-
-1. Copy `agents/windows/` to the target server
-2. Open PowerShell as Administrator
-3. Run:
+### Windows
 
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process
 .\install.ps1 -ApiUrl "https://your-platform:8080/api/v1" -ApiToken "<token>"
-```
-
-4. Verify the scheduled task is running:
-
-```powershell
 Get-ScheduledTask -TaskName VulnShieldAgent
 ```
 
-## Step 8: Configure LDAP (Optional)
+---
 
-For enterprise SSO, enable LDAP in `.env`:
+## Step 7: Configure notifications (optional)
+
+```bash
+# In .env
+SMTP_HOST=smtp.yourcompany.com
+SMTP_PORT=587
+SMTP_USER=alerts@yourcompany.com
+SMTP_PASSWORD=<smtp-password>
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+```bash
+docker compose up -d notification-service
+```
+
+---
+
+## Step 8: LDAP SSO (optional)
 
 ```bash
 LDAP_ENABLED=true
 LDAP_SERVER=ldap://ldap.corp.local:389
 LDAP_BASE_DN=dc=corp,dc=local
 LDAP_BIND_DN=cn=vulnshield,ou=services,dc=corp,dc=local
-LDAP_BIND_PASSWORD=ldap-bind-password
+LDAP_BIND_PASSWORD=<bind-password>
 ```
-
-Restart auth-service:
 
 ```bash
 docker compose up -d auth-service
 ```
 
-## Step 9: Generate Agent Registration Token
+---
 
-1. Log in to the admin console as administrator
-2. Navigate to **Settings → Agents → Registration Tokens**
-3. Create a new token with appropriate scope (Linux, Windows, or both)
-4. Use this token as `VULNSHIELD_API_TOKEN` in agent configuration
-
-## Step 10: Enable mTLS (Production)
-
-1. Generate a CA and client certificates:
+## Step 9: Kubernetes (production)
 
 ```bash
-mkdir -p certs && cd certs
-openssl genrsa -out ca.key 4096
-openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=VulnShield CA"
-openssl genrsa -out client.key 2048
-openssl req -new -key client.key -out client.csr -subj "/CN=agent-hostname"
-openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt
+cp k8s/secrets.example.yaml k8s/secrets.yaml
+# Edit secrets.yaml and configmap.yaml (CORS_ORIGINS, NEXT_PUBLIC_API_URL)
+
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/
+kubectl apply -f k8s/network-policy.yaml
 ```
 
-2. Deploy certificates to agents at `/etc/vulnshield/certs/` (Linux) or `C:\ProgramData\VulnShield\certs\` (Windows)
-3. Set `VULNSHIELD_MTLS_ENABLED=true` in agent configuration
-4. Configure the API Gateway to validate client certificates
+Set `NEXT_PUBLIC_API_URL` in ConfigMap to your **public ingress URL**, not cluster DNS.
 
-## Post-Installation Checklist
+---
 
-- [ ] Default admin password changed
-- [ ] JWT secret and database passwords rotated from defaults
+## Post-installation checklist
+
+- [ ] Admin password changed after first login
+- [ ] All secrets rotated from example values
+- [ ] `ENVIRONMENT=sandbox` or `production` set
+- [ ] `NEXT_PUBLIC_ENABLE_DEMO_MODE=false`
 - [ ] Agent registration tokens created
-- [ ] At least one endpoint agent installed and showing online
-- [ ] SMTP/Slack notifications configured and tested
-- [ ] Database backup schedule configured
-- [ ] Firewall rules applied (only required ports exposed)
-- [ ] LDAP/MFA enabled if required by security policy
+- [ ] At least one agent online in Assets
+- [ ] Notifications tested
+- [ ] Database backup scheduled
+- [ ] Firewall: only 443/8080 exposed publicly
+- [ ] TLS terminated at ingress
+- [ ] LDAP/MFA enabled per policy
 
-## Uninstallation
+---
+
+## Uninstall
 
 ```bash
-# Stop and remove all containers and volumes
-make clean
+make clean   # Docker
 
-# Remove agent (Linux)
-sudo systemctl stop vulnshield-agent
-sudo systemctl disable vulnshield-agent
+# Linux agent
+sudo systemctl stop vulnshield-agent && sudo systemctl disable vulnshield-agent
 sudo rm -rf /opt/vulnshield-agent /etc/vulnshield
-sudo rm /etc/systemd/system/vulnshield-agent.service
 
-# Remove agent (Windows)
+# Windows agent
 Unregister-ScheduledTask -TaskName VulnShieldAgent -Confirm:$false
-Remove-Item -Recurse -Force "C:\Program Files\VulnShield", "C:\ProgramData\VulnShield"
 ```
+
+---
+
+## Related docs
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Docker Compose reference
+- [ADMIN_MANUAL.md](ADMIN_MANUAL.md) — Ongoing administration
+- [CAPABILITIES.md](CAPABILITIES.md) — Platform operations

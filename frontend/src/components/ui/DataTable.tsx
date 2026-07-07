@@ -48,6 +48,8 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   onSortChange?: (field: string, order: 'asc' | 'desc') => void;
+  onRowClick?: (row: T) => void;
+  rowActions?: (row: T) => React.ReactNode;
   searchPlaceholder?: string;
   onSearchChange?: (query: string) => void;
   filters?: FilterOption[];
@@ -66,6 +68,8 @@ export function DataTable<T>({
   onPageChange,
   onPageSizeChange,
   onSortChange,
+  onRowClick,
+  rowActions,
   searchPlaceholder = 'Search...',
   onSearchChange,
   filters,
@@ -146,7 +150,7 @@ export function DataTable<T>({
               <TableRow>
                 {columns.map((col) => (
                   <TableCell key={col.id} width={col.width}>
-                    {col.sortable !== false && onSortChange ? (
+                    {col.sortable && onSortChange ? (
                       <TableSortLabel
                         active={sortField === col.id}
                         direction={sortField === col.id ? sortOrder : 'asc'}
@@ -159,6 +163,7 @@ export function DataTable<T>({
                     )}
                   </TableCell>
                 ))}
+                {rowActions && <TableCell align="right">Actions</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -175,13 +180,18 @@ export function DataTable<T>({
                 : data.length === 0
                   ? (
                     <TableRow>
-                      <TableCell colSpan={columns.length} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={columns.length + (rowActions ? 1 : 0)} align="center" sx={{ py: 4 }}>
                         <Typography color="text.secondary">{emptyMessage}</Typography>
                       </TableCell>
                     </TableRow>
                   )
                   : data.map((row) => (
-                    <TableRow key={getRowId(row)} hover>
+                    <TableRow
+                      key={getRowId(row)}
+                      hover
+                      onClick={() => onRowClick?.(row)}
+                      sx={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                    >
                       {columns.map((col) => (
                         <TableCell key={col.id}>
                           {col.render
@@ -191,6 +201,11 @@ export function DataTable<T>({
                               : (row as Record<string, unknown>)[col.id]?.toString()}
                         </TableCell>
                       ))}
+                      {rowActions && (
+                        <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                          {rowActions(row)}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
             </TableBody>

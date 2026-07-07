@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'access_token';
+export const MOCK_ACCESS_TOKEN = 'mock-demo-access-token';
 const REFRESH_KEY = 'refresh_token';
 const USER_KEY = 'user';
 

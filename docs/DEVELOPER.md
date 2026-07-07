@@ -2,6 +2,10 @@
 
 Guide for extending VulnShield microservices, adding collectors, and contributing to the platform.
 
+> **Docs hub:** [docs/README.md](README.md) · **Deploy:** [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md) · **Capabilities:** [CAPABILITIES.md](CAPABILITIES.md)
+
+![Architecture overview](images/architecture-overview.png)
+
 ## Repository Structure
 
 ```

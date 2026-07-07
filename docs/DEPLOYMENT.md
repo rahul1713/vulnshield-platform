@@ -1,241 +1,181 @@
-# VulnShield Platform Deployment Guide
+# VulnShield Deployment Guide
 
-This guide covers deploying VulnShield using Docker Compose for development and staging environments.
+Deploy VulnShield with Docker Compose. For production-hardened sandbox deployments, prefer [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md).
 
-## Prerequisites
+![Deployment flow](images/deployment-flow.png)
 
-- Docker Engine 24+ and Docker Compose v2
-- 16 GB RAM minimum (32 GB recommended with AI services)
-- 50 GB disk space
-- Ports available: 3000, 5432, 5672, 6379, 8080, 9000, 9001, 11434 (optional)
+## Choose your deployment path
 
-## Quick Start
+| Path | Command | Best for |
+|------|---------|----------|
+| **Sandbox (recommended)** | `make sandbox-env && make sandbox-up` | Staging, POC, security labs |
+| **Development** | `cp .env.example .env && make up` | Local engineering |
+
+---
+
+## Sandbox deployment (recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/vulnshield-platform.git
+git clone https://github.com/rahul1713/vulnshield-platform.git
 cd vulnshield-platform
 
-# Configure environment
+make sandbox-env    # Generates .env.sandbox with random secrets
+make sandbox-up     # Starts hardened stack
+```
+
+- Admin password printed once during `make sandbox-env`
+- Only API (`127.0.0.1:8080`) and UI (`127.0.0.1:3000`) exposed
+- Postgres, Redis, RabbitMQ, MinIO stay on internal Docker network
+- Demo mode disabled at build time
+
+Full checklist → [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md)
+
+---
+
+## Development deployment
+
+### Prerequisites
+
+- Docker Engine 24+ and Docker Compose v2
+- 16 GB RAM (32 GB with AI services)
+- 50 GB disk
+
+### Steps
+
+```bash
+git clone https://github.com/rahul1713/vulnshield-platform.git
+cd vulnshield-platform
+
 cp .env.example .env
-# Edit .env — change JWT_SECRET and database passwords for production
+# Edit .env — set JWT_SECRET, INIT_ADMIN_PASSWORD, database passwords
+# Generate secrets: openssl rand -hex 32
 
-# Start all services
+make build
 make up
-
-# Verify services are running
 docker compose ps
 ```
 
-The platform will be available at:
+### Access URLs
 
 | Service | URL |
 |---------|-----|
-| Frontend Dashboard | http://localhost:3000 |
+| Dashboard | http://localhost:3000 |
 | API Gateway | http://localhost:8080/api/v1 |
-| RabbitMQ Management | http://localhost:15672 |
-| MinIO Console | http://localhost:9001 |
+| Health | http://localhost:8080/health |
 
-Default credentials: `admin@vulnshield.local` / `Admin@123456`
+Log in with credentials from `INIT_ADMIN_PASSWORD` in your `.env` file.
 
-## Service Profiles
+---
 
-### Core Platform (default)
+## Environment configuration
 
-Starts infrastructure and all application services:
-
-```bash
-docker compose up -d
-```
-
-### With AI Services
-
-Ollama starts automatically with the stack. Security AI (vulnerability scanning, code review, red teaming) uses **local Qwen 3.6 only**:
+Key variables (see `.env.example` for full list):
 
 ```bash
-docker compose up -d
-docker compose exec ollama ollama pull qwen3.6
-```
+ENVIRONMENT=development
+JWT_SECRET=<openssl rand -hex 32>
+INIT_ADMIN_PASSWORD=<strong-password-min-12-chars>
+POSTGRES_PASSWORD=<openssl rand -hex 24>
+RABBITMQ_PASSWORD=<openssl rand -hex 24>
+REDIS_PASSWORD=<openssl rand -hex 24>   # Required in sandbox/production
+CORS_ORIGINS=http://localhost:3000
 
-## Environment Configuration
-
-Key variables in `.env`:
-
-```bash
-# Security — change in production
-JWT_SECRET=your-256-bit-secret-here
-POSTGRES_PASSWORD=strong-random-password
-RABBITMQ_PASSWORD=strong-random-password
-
-# Security AI — local Ollama + Qwen 3.6 only (cloud providers not permitted)
-LLM_PROVIDER=ollama
+# Security AI — local Ollama + Qwen 3.6 only
 OLLAMA_MODEL=qwen3.6
 AI_SECURITY_LOCAL_ONLY=true
-AI_SECURITY_ALLOWED_MODELS=qwen3.6
-
-# Notifications (optional)
-SMTP_HOST=smtp.company.com
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-See `.env.example` for the complete list.
+---
 
-## Infrastructure Services
+## AI services (optional)
 
-### PostgreSQL
-
-- Image: `postgres:16-alpine`
-- Port: 5432
-- Database auto-initialized from `shared/database/init/`
-- Data persisted in `postgres_data` volume
-
-### Redis
-
-- Image: `redis:7-alpine`
-- Port: 6379
-- Used for session caching and scan job queues
-
-### RabbitMQ
-
-- Image: `rabbitmq:3.13-management-alpine`
-- AMQP port: 5672, Management UI: 15672
-- Default vhost: `vulnshield`
-
-### MinIO
-
-- Ports: 9000 (API), 9001 (Console)
-- Bucket: `vulnshield-evidence` (created on first use)
-- Stores vulnerability evidence files and generated reports
-
-## Application Services
-
-All application services are built from Dockerfiles in `services/` and share environment variables via the `x-common-env` anchor in `docker-compose.yml`.
-
-Build all images:
+Pull the local security AI model after the stack is running:
 
 ```bash
-make build
+docker compose --profile ai up -d ollama
+docker compose exec ollama ollama pull qwen3.6
+docker compose up -d scanner-service ai-code-review ai-redteam
 ```
 
-Build a single service:
+---
 
-```bash
-docker compose build auth-service
-```
+## Infrastructure services
 
-## Database Management
+| Service | Image | Purpose |
+|---------|-------|---------|
+| PostgreSQL 16 | `postgres:16-alpine` | Primary data store |
+| Redis 7 | `redis:7-alpine` | Cache and job queues |
+| RabbitMQ 3.13 | `rabbitmq:3.13-management-alpine` | Event messaging |
+| MinIO | `minio/minio` | Evidence files and reports |
+| Ollama | `ollama/ollama` | Local LLM for security AI |
 
-Initial schema and seed data load automatically on first PostgreSQL startup. To re-run manually:
+Schema and seed data load automatically from `shared/database/init/` on first PostgreSQL start.
 
-```bash
-make migrate
-make seed
-```
+---
 
-## Agent Deployment
+## Agent deployment
 
-### Linux Agent (Docker)
+### Linux (Docker)
 
 ```bash
 docker build -t vulnshield-linux-agent agents/linux/
-
 docker run -d \
-  --name vulnshield-agent \
   -e VULNSHIELD_API_URL=https://your-gateway:8080/api/v1 \
   -e VULNSHIELD_API_TOKEN=your-agent-token \
-  -v /etc/vulnshield/certs:/etc/vulnshield/certs:ro \
   vulnshield-linux-agent
 ```
 
-### Linux Agent (systemd)
-
-```bash
-sudo mkdir -p /opt/vulnshield-agent /etc/vulnshield
-sudo cp -r agents/linux/* /opt/vulnshield-agent/
-sudo pip install -r /opt/vulnshield-agent/requirements.txt
-
-cat << 'EOF' | sudo tee /etc/vulnshield/agent.env
-VULNSHIELD_API_URL=https://your-gateway:8080/api/v1
-VULNSHIELD_API_TOKEN=your-agent-token
-VULNSHIELD_MTLS_ENABLED=true
-EOF
-
-sudo python /opt/vulnshield-agent/agent.py
-```
-
-### Windows Agent
-
-Run as Administrator on the target host:
+### Windows
 
 ```powershell
-.\agents\windows\install.ps1 `
-  -ApiUrl "https://your-gateway:8080/api/v1" `
-  -ApiToken "your-agent-token" `
-  -EnableMtls
+.\agents\windows\install.ps1 -ApiUrl "https://your-gateway:8080/api/v1" -ApiToken "your-token"
 ```
 
-## Monitoring & Logs
+---
 
-View all service logs:
+## Operations
 
 ```bash
-make logs
+make logs              # All service logs
+make down              # Stop services
+make clean             # Stop and remove volumes
+docker compose logs -f auth-service   # Single service
 ```
 
-View a specific service:
-
-```bash
-docker compose logs -f auth-service
-```
-
-Health checks are configured on PostgreSQL, Redis, and RabbitMQ. The API Gateway waits for auth-service and database health before accepting traffic.
-
-## Backup & Recovery
-
-### Database Backup
+### Database backup
 
 ```bash
 docker compose exec postgres pg_dump -U vulnshield vulnshield > backup.sql
-```
-
-### Restore
-
-```bash
 docker compose exec -T postgres psql -U vulnshield vulnshield < backup.sql
 ```
 
-### Volume Backup
+---
 
-```bash
-docker run --rm \
-  -v vulnshield-platform_postgres_data:/data \
-  -v $(pwd):/backup \
-  alpine tar czf /backup/postgres_backup.tar.gz /data
-```
+## Production considerations
 
-## Production Considerations
+1. Use [SANDBOX_DEPLOYMENT.md](SANDBOX_DEPLOYMENT.md) or Kubernetes (`k8s/`) for production
+2. Terminate TLS at ingress (nginx, Traefik, cloud LB)
+3. Store secrets in a vault — never commit `.env.sandbox` or `k8s/secrets.yaml`
+4. Schedule PostgreSQL and MinIO backups
+5. Enable LDAP/MFA per [ADMIN_MANUAL.md](ADMIN_MANUAL.md)
+6. Restrict agent network access to API gateway only
 
-1. **Secrets**: Use Docker secrets or a vault (HashiCorp Vault, AWS Secrets Manager) instead of `.env` files
-2. **TLS**: Terminate TLS at a reverse proxy (nginx, Traefik) in front of the API Gateway
-3. **Scaling**: Use Kubernetes manifests in `k8s/` for horizontal scaling
-4. **Monitoring**: Add Prometheus/Grafana for metrics; services expose `/metrics` endpoints
-5. **Backups**: Schedule automated PostgreSQL and MinIO backups
-6. **Network**: Place agents in a dedicated VLAN with firewall rules allowing only HTTPS to the gateway
+---
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Services fail to start | Check `docker compose logs` for dependency errors |
-| Database connection refused | Wait for PostgreSQL health check; verify credentials in `.env` |
-| Frontend shows API errors | Confirm `NEXT_PUBLIC_API_URL` matches the gateway URL |
-| RabbitMQ connection failed | Verify vhost `vulnshield` exists and credentials match |
-| Ollama model not found | Run `docker compose exec ollama ollama pull qwen3.6` |
+| Services won't start | `docker compose logs` — check dependency health |
+| Login fails | Verify `INIT_ADMIN_PASSWORD` was set before first auth-service start |
+| Frontend API errors | Confirm `NEXT_PUBLIC_API_URL` matches gateway URL |
+| AI features unavailable | `docker compose exec ollama ollama pull qwen3.6` |
+| Sandbox secret validation fails | Regenerate with `make sandbox-env` — no weak defaults allowed |
 
-## Cleanup
+---
 
-Remove all containers and volumes:
+## Related docs
 
-```bash
-make clean
-```
+- [INSTALLATION.md](INSTALLATION.md) — Full server install with agents and LDAP
+- [CAPABILITIES.md](CAPABILITIES.md) — Platform operations reference
+- [ARCHITECTURE.md](ARCHITECTURE.md) — System design

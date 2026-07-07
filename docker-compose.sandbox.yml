@@ -1,0 +1,99 @@
+# Sandbox deployment overrides — no data leakage, no exposed infrastructure ports.
+# Usage:
+#   ./scripts/generate-sandbox-env.sh .env.sandbox
+#   docker compose --env-file .env.sandbox -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+
+x-sandbox-env: &sandbox-env
+  ENVIRONMENT: sandbox
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required for sandbox}
+  INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-admin}
+  INIT_ADMIN_EMAIL: ${INIT_ADMIN_EMAIL:-admin@vulnshield.local}
+  INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:?INIT_ADMIN_PASSWORD is required for sandbox}
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+  redis:
+    ports: !reset []
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  rabbitmq:
+    ports: !reset []
+
+  minio:
+    ports: !reset []
+
+  ollama:
+    ports: !reset []
+
+  api-gateway:
+    environment:
+      <<: *sandbox-env
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  auth-service:
+    environment:
+      <<: *sandbox-env
+      JWT_SECRET: ${JWT_SECRET}
+
+  asset-service:
+    environment:
+      <<: *sandbox-env
+
+  scanner-service:
+    environment:
+      <<: *sandbox-env
+
+  web-scanner-service:
+    environment:
+      <<: *sandbox-env
+
+  ai-code-review:
+    environment:
+      <<: *sandbox-env
+
+  ai-redteam:
+    environment:
+      <<: *sandbox-env
+
+  patch-intelligence:
+    environment:
+      <<: *sandbox-env
+
+  risk-engine:
+    environment:
+      <<: *sandbox-env
+
+  reporting-service:
+    environment:
+      <<: *sandbox-env
+
+  compliance-service:
+    environment:
+      <<: *sandbox-env
+
+  notification-service:
+    environment:
+      <<: *sandbox-env
+
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_DEPLOY_ENV: sandbox
+        NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
+    environment:
+      NEXT_PUBLIC_DEPLOY_ENV: sandbox
+      NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
+    ports:
+      - "127.0.0.1:3000:3000"

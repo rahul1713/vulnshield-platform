@@ -1,11 +1,12 @@
 'use client';
 
-import { Button, Chip } from '@mui/material';
-import { PlayArrow } from '@mui/icons-material';
+import { Button, IconButton, Stack } from '@mui/material';
+import { PlayArrow, Stop } from '@mui/icons-material';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { scansApi } from '@/lib/api';
-import { MOCK_SCANS, paginate } from '@/lib/mock-data';
+import { useToast } from '@/components/ui/ToastProvider';
+import { CreateScanDialog } from '@/components/scans/CreateScanDialog';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
@@ -21,37 +22,69 @@ const columns: Column<Scan>[] = [
     label: 'Breakdown',
     render: (row) => (
       <span className="text-xs">
-        <Chip label={`C:${row.critical_count}`} size="small" color="error" sx={{ mr: 0.5 }} />
-        <Chip label={`H:${row.high_count}`} size="small" color="warning" sx={{ mr: 0.5 }} />
-        <Chip label={`M:${row.medium_count}`} size="small" />
+        C:{row.critical_count} H:{row.high_count} M:{row.medium_count}
       </span>
     ),
   },
   { id: 'started_at', label: 'Started', getValue: (row) => row.started_at ? new Date(row.started_at).toLocaleString() : '—' },
-  { id: 'duration_seconds', label: 'Duration', getValue: (row) => row.duration_seconds ? `${Math.round(row.duration_seconds / 60)}m` : '—' },
 ];
 
 export default function ScansPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['scans', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await scansApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_SCANS, page + 1, pageSize);
-      }
+    queryFn: () => scansApi.list({ page: page + 1, page_size: pageSize }),
+    refetchInterval: 3000,
+  });
+
+  const startMutation = useMutation({
+    mutationFn: (id: string) => scansApi.start(id),
+    onSuccess: () => {
+      showToast('Scan started successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['scans'] });
+    },
+    onError: (e: Error) => showToast(e.message, 'error'),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => scansApi.cancel(id),
+    onSuccess: () => {
+      showToast('Scan cancelled', 'info');
+      queryClient.invalidateQueries({ queryKey: ['scans'] });
     },
   });
+
+  const handleCreate = async (payload: { name: string; scan_type: Scan['scan_type']; target_asset_id?: string }) => {
+    try {
+      const scan = await scansApi.create(payload);
+      showToast(`Scan "${scan.name}" created`, 'success');
+      await refetch();
+      if (scan.id) {
+        await scansApi.start(scan.id);
+        showToast('Scan started', 'success');
+        await refetch();
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to create scan', 'error');
+      throw e;
+    }
+  };
 
   return (
     <>
       <PageHeader
         title="Scans"
         subtitle="Manage vulnerability and compliance scans"
-        action={<Button variant="contained" startIcon={<PlayArrow />}>New Scan</Button>}
+        action={
+          <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setDialogOpen(true)}>
+            New Scan
+          </Button>
+        }
       />
       <DataTable
         columns={columns}
@@ -64,7 +97,32 @@ export default function ScansPage() {
         onPageSizeChange={setPageSize}
         searchPlaceholder="Search scans..."
         getRowId={(row) => row.id}
+        rowActions={(row) => (
+          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+            {(row.status === 'queued' || row.status === 'failed') && (
+              <IconButton
+                size="small"
+                color="primary"
+                title="Start scan"
+                onClick={() => startMutation.mutate(row.id)}
+              >
+                <PlayArrow fontSize="small" />
+              </IconButton>
+            )}
+            {row.status === 'running' && (
+              <IconButton
+                size="small"
+                color="warning"
+                title="Cancel scan"
+                onClick={() => cancelMutation.mutate(row.id)}
+              >
+                <Stop fontSize="small" />
+              </IconButton>
+            )}
+          </Stack>
+        )}
       />
+      <CreateScanDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSubmit={handleCreate} />
     </>
   );
 }

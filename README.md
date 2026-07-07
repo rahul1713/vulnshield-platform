@@ -1,202 +1,263 @@
 # VulnShield Platform
 
-A cloud-native vulnerability management platform with asset discovery, AI-powered code review, red team simulation, patch intelligence, risk scoring, and compliance mapping.
+**Enterprise vulnerability management** — asset discovery, scanning, AI-assisted analysis, risk prioritization, compliance, and reporting. Built as cloud-native microservices with Docker Compose and Kubernetes support.
 
-## Features
+[![CI](https://github.com/rahul1713/vulnshield-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/rahul1713/vulnshield-platform/actions/workflows/ci.yml)
 
-- **Asset Discovery** — Linux and Windows agents collect OS info, packages, services, ports, users, cron jobs, and patches
-- **Vulnerability Scanning** — Agent-based, network, and web application scanning with CVE correlation
-- **AI Code Review** — LLM-powered static analysis with OWASP/CWE mapping and fix recommendations
-- **AI Red Team** — Automated attack simulation with MITRE ATT&CK technique mapping
-- **Patch Intelligence** — CVE-to-patch mapping, vendor advisories, and EOL tracking
-- **Risk Engine** — Composite scoring using CVSS, EPSS, CISA KEV, and business context
-- **Compliance** — CIS Controls, NIST CSF, NIST 800-53, ISO 27001, PCI-DSS assessments
-- **Reporting** — Executive, technical, compliance, and trending reports (PDF, Excel, CSV)
-- **Notifications** — Email, Slack, Teams, and webhook alerting
+---
+
+## Deploy in 3 steps (sandbox — recommended)
+
+Industry-hardened deployment with **no hardcoded passwords**, **no demo data leakage**, and infrastructure ports kept internal.
+
+![Deployment flow](docs/images/deployment-flow.png)
+
+```bash
+git clone https://github.com/rahul1713/vulnshield-platform.git
+cd vulnshield-platform
+
+# Step 1 — Generate secrets (admin password shown once — save it securely)
+make sandbox-env
+
+# Step 2 — Start the platform
+make sandbox-up
+
+# Step 3 — Open the dashboard
+open http://localhost:3000
+```
+
+| After deploy | URL |
+|--------------|-----|
+| **Dashboard** | http://localhost:3000 |
+| **API** | http://localhost:8080/api/v1 |
+| **Health check** | http://localhost:8080/health |
+
+Log in with the admin credentials printed by `make sandbox-env`. Full security checklist → [docs/SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md)
+
+### Other deployment options
+
+| Method | When to use | Guide |
+|--------|-------------|-------|
+| **Sandbox (Docker)** | Staging, POC, isolated lab | [SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md) |
+| **Development (Docker)** | Local engineering | [DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| **Kubernetes** | Production / enterprise scale | [INSTALLATION.md](docs/INSTALLATION.md) + `k8s/` |
+
+**Requirements:** Docker 24+, Compose v2, 16 GB RAM, 50 GB disk.
+
+---
+
+## What VulnShield does
+
+![Operations workflow](docs/images/operations-workflow.png)
+
+VulnShield runs a continuous **Discover → Scan → Correlate → Prioritize → Remediate** loop across your infrastructure.
+
+![Dashboard overview](docs/images/dashboard-overview.png)
+
+---
+
+## Platform capabilities & operations
+
+Each module below maps to a **sidebar section** in the dashboard and a **microservice** in the backend.
+
+### Asset management
+| Operation | What it does |
+|-----------|--------------|
+| **Discover assets** | Linux/Windows agents collect OS, packages, ports, users, services, and patches |
+| **View inventory** | Search and filter servers, workstations, and cloud assets by criticality, OS, tags |
+| **Track changes** | History of asset metadata, software inventory, and open ports over time |
+
+### Vulnerability scanning
+| Operation | What it does |
+|-----------|--------------|
+| **New scan** | Launch agent-based, SSH/WinRM, network, CIS, or web-app scans from the Scans page |
+| **Start / cancel scan** | Control running jobs; status updates in real time (queued → running → completed) |
+| **View findings** | CVE correlation with CVSS, EPSS, and CISA KEV data |
+| **Update status** | Triage vulnerabilities: open → in progress → mitigated → resolved / false positive |
+
+### Web application security (DAST)
+| Operation | What it does |
+|-----------|--------------|
+| **Start web scan** | Crawl and test a target URL for OWASP Top 10 issues |
+| **Review findings** | SQLi, XSS, missing headers, and other DAST results with severity |
+
+### AI code review
+| Operation | What it does |
+|-----------|--------------|
+| **New review** | Submit a repository URL for LLM-powered static security analysis |
+| **View findings** | OWASP/CWE-mapped issues with remediation guidance |
+| **Model** | Local **Ollama + Qwen 3.6 only** — source code never sent to cloud LLMs |
+
+### AI red team
+| Operation | What it does |
+|-----------|--------------|
+| **New campaign** | Launch automated adversary simulation against defined scope |
+| **Attack paths** | MITRE ATT&CK-mapped findings and executive summary |
+| **Model** | Local **Ollama + Qwen 3.6 only** |
+
+### Patch intelligence
+| Operation | What it does |
+|-----------|--------------|
+| **CVE lookup** | Map vulnerabilities to available vendor patches |
+| **EOL tracking** | End-of-life status for affected software |
+| **Advisory feed** | Vendor security bulletin references |
+
+### Risk engine
+| Operation | What it does |
+|-----------|--------------|
+| **Risk scoring** | Composite score: CVSS + EPSS + KEV + asset criticality + exposure |
+| **Heatmap** | Visual risk distribution across assets and categories |
+| **Prioritization** | Rank what to fix first based on business context |
+
+### Compliance
+| Operation | What it does |
+|-----------|--------------|
+| **Run assessment** | Score against CIS Controls, NIST CSF, NIST 800-53, ISO 27001, PCI-DSS |
+| **Gap analysis** | Passed vs. failed controls with remediation mapping |
+| **Trend tracking** | Compliance score over time |
+
+### Reporting
+| Operation | What it does |
+|-----------|--------------|
+| **Executive report** | High-level risk posture for leadership (PDF) |
+| **Technical report** | Detailed findings for engineering teams |
+| **Compliance report** | Framework-specific evidence (PDF, Excel, CSV) |
+| **Export** | Scheduled or on-demand report generation |
+
+### Notifications
+| Operation | What it does |
+|-----------|--------------|
+| **Email alerts** | SMTP notifications for critical findings and scan completion |
+| **Slack / Teams** | Webhook integration for SOC channels |
+| **Custom webhooks** | Push events to SIEM or ticketing systems |
+
+### Administration
+| Operation | What it does |
+|-----------|--------------|
+| **User & RBAC** | Roles: administrator, security manager, SOC analyst, developer, auditor |
+| **Audit logs** | Immutable record of logins, scan actions, and config changes |
+| **Agent tokens** | Register Linux/Windows agents with scoped API tokens |
+| **LDAP / MFA** | Enterprise SSO and TOTP multi-factor authentication |
+
+---
 
 ## Architecture
 
+![Architecture overview](docs/images/architecture-overview.png)
+
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────────────────────┐
-│   Frontend  │────▶│  API Gateway │────▶│  Microservices (12 services)    │
-│  (Next.js)  │     │   (:8080)    │     │  auth, asset, scanner, AI, ...  │
-└─────────────┘     └──────────────┘     └─────────────────────────────────┘
-       ▲                                          │         │         │
-       │                                          ▼         ▼         ▼
-┌─────────────┐                            ┌──────────┐ ┌───────┐ ┌─────────┐
-│ Linux/Win   │──── HTTPS/mTLS ──────────▶│PostgreSQL│ │ Redis │ │RabbitMQ │
-│   Agents    │                            └──────────┘ └───────┘ └─────────┘
-└─────────────┘
+Browser / Agents  →  API Gateway (:8080)  →  12 Microservices  →  PostgreSQL / Redis / RabbitMQ / MinIO
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture diagrams.
+| Service | Port (internal) | Purpose |
+|---------|-----------------|---------|
+| api-gateway | 8080 | JWT validation, routing, TLS termination point |
+| auth-service | 8001 | Login, RBAC, audit, LDAP, MFA |
+| asset-service | 8002 | Asset inventory and discovery |
+| scanner-service | 8003 | Vulnerability scans, agents, CVE correlation |
+| web-scanner-service | 8004 | DAST web application scanning |
+| ai-code-review | 8005 | LLM code security analysis |
+| ai-redteam | 8006 | Adversary simulation |
+| patch-intelligence | 8007 | Patch and EOL mapping |
+| risk-engine | 8008 | Composite risk scoring |
+| reporting-service | 8009 | PDF / Excel / CSV reports |
+| compliance-service | 8010 | Framework assessments |
+| notification-service | 8011 | Email, Slack, Teams alerts |
 
-## Quick Start
+Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-### Prerequisites
+---
 
-- Docker Engine 24+ and Docker Compose v2
-- 16 GB RAM, 50 GB disk
+## Endpoint agents
 
-### Start the Platform
+### Linux agent
+Collects OS info, packages (dpkg/rpm/apk), processes, ports, users, cron, systemd services, kernel modules, and security patches. Supports HTTPS and mTLS.
 
 ```bash
-git clone https://github.com/your-org/vulnshield-platform.git
-cd vulnshield-platform
-cp .env.example .env
-make up
-```
-
-| Service | URL |
-|---------|-----|
-| Dashboard | http://localhost:3000 |
-| API | http://localhost:8080/api/v1 |
-| RabbitMQ UI | http://localhost:15672 |
-| MinIO Console | http://localhost:9001 |
-
-**Default login:** `admin@vulnshield.local` / `Admin@123456`
-
-### Install a Linux Agent
-
-```bash
-# Docker
 docker build -t vulnshield-linux-agent agents/linux/
 docker run -d \
   -e VULNSHIELD_API_URL=http://host.docker.internal:8080/api/v1 \
-  -e VULNSHIELD_API_TOKEN=your-token \
+  -e VULNSHIELD_API_TOKEN=your-agent-token \
   vulnshield-linux-agent
-
-# Or run directly
-cd agents/linux
-pip install -r requirements.txt
-VULNSHIELD_API_URL=http://localhost:8080/api/v1 \
-VULNSHIELD_API_TOKEN=your-token \
-python agent.py
 ```
 
-### Install a Windows Agent
+### Windows agent
+PowerShell/Python hybrid. Collects OS, registry software, services, scheduled tasks, ports, hotfixes, and local users.
 
 ```powershell
-# Run as Administrator
-.\agents\windows\install.ps1 `
-  -ApiUrl "http://your-server:8080/api/v1" `
-  -ApiToken "your-token"
+.\agents\windows\install.ps1 -ApiUrl "https://your-server:8080/api/v1" -ApiToken "your-token"
 ```
 
-## Project Structure
-
-```
-vulnshield-platform/
-├── agents/              # Linux & Windows endpoint agents
-├── docs/                # Architecture, deployment, user guides
-├── frontend/            # Next.js dashboard
-├── k8s/                 # Kubernetes manifests
-├── services/            # 12 microservices
-│   ├── api-gateway/
-│   ├── auth-service/
-│   ├── asset-service/
-│   ├── scanner-service/
-│   ├── web-scanner-service/
-│   ├── ai-code-review/
-│   ├── ai-redteam/
-│   ├── patch-intelligence/
-│   ├── risk-engine/
-│   ├── reporting-service/
-│   ├── compliance-service/
-│   └── notification-service/
-├── shared/              # Database schema & Python shared library
-├── .github/workflows/   # CI/CD pipelines
-├── docker-compose.yml
-└── Makefile
-```
-
-## Microservices
-
-| Service | Description |
-|---------|-------------|
-| **api-gateway** | Single entry point, JWT validation, routing |
-| **auth-service** | Authentication, RBAC, LDAP/MFA |
-| **asset-service** | Asset inventory, agent management |
-| **scanner-service** | Vulnerability scan orchestration |
-| **web-scanner-service** | OWASP web application scanning |
-| **ai-code-review** | LLM-powered source code analysis |
-| **ai-redteam** | AI attack simulation |
-| **patch-intelligence** | CVE patch mapping |
-| **risk-engine** | Composite risk scoring |
-| **reporting-service** | Report generation (PDF/Excel/CSV) |
-| **compliance-service** | Framework assessments |
-| **notification-service** | Multi-channel alerting |
+---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | System design with mermaid diagrams |
-| [ER Diagram](docs/ER_DIAGRAM.md) | Database entity relationships |
-| [Deployment](docs/DEPLOYMENT.md) | Docker Compose deployment guide |
-| [Installation](docs/INSTALLATION.md) | Step-by-step installation |
-| [Developer Guide](docs/DEVELOPER.md) | Extending services and agents |
-| [User Manual](docs/USER_MANUAL.md) | End user dashboard guide |
-| [Admin Manual](docs/ADMIN_MANUAL.md) | Platform administration |
+| Document | Audience | Contents |
+|----------|----------|----------|
+| [CAPABILITIES.md](docs/CAPABILITIES.md) | Everyone | Full feature reference with operations |
+| [SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md) | DevOps / Security | Hardened sandbox deploy + checklist |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | DevOps | Docker Compose deployment |
+| [INSTALLATION.md](docs/INSTALLATION.md) | DevOps | Step-by-step install + agents + LDAP |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architects | System design, data flow, mermaid diagrams |
+| [USER_MANUAL.md](docs/USER_MANUAL.md) | SOC / Analysts | Dashboard walkthrough |
+| [ADMIN_MANUAL.md](docs/ADMIN_MANUAL.md) | Admins | Users, agents, backups, hardening |
+| [DEVELOPER.md](docs/DEVELOPER.md) | Engineers | Extending services and agents |
+| [ER_DIAGRAM.md](docs/ER_DIAGRAM.md) | DBAs | Database entity relationships |
+
+---
 
 ## Development
 
 ```bash
-make build          # Build all Docker images
-make up             # Start services
-make logs           # Tail logs
+make build          # Build Docker images
+make up             # Start development stack
+make logs           # Tail service logs
 make test           # Run tests
 make lint           # Run linters
-make down           # Stop services
+make sandbox-up     # Start hardened sandbox
 make clean          # Remove containers and volumes
 ```
 
-## CI/CD
-
-- **CI** (`.github/workflows/ci.yml`) — Lint, test, and build on push/PR
-- **Docker Publish** (`.github/workflows/docker-publish.yml`) — Build and push images on version tags
-
-## Kubernetes
-
-Optional manifests in `k8s/` for production deployment:
+### Local UI-only mode (no backend)
 
 ```bash
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/redis.yaml
-kubectl apply -f k8s/infrastructure.yaml
-kubectl apply -f k8s/services.yaml
+# frontend/.env.local
+NEXT_PUBLIC_ENABLE_DEMO_MODE=true
+NEXT_PUBLIC_DEMO_USERNAME=admin
+NEXT_PUBLIC_DEMO_PASSWORD=your-local-password
 ```
 
-## Agent Collectors
+Never enable demo mode in sandbox or production builds.
 
-### Linux Agent
+---
 
-Collects: OS info, installed packages (dpkg/rpm/apk), running processes, open ports, users, cron jobs, systemd services, kernel version/modules, security patches.
+## Technology stack
 
-Supports HTTPS with mutual TLS. Configuration via `/etc/vulnshield/agent.env`.
-
-### Windows Agent
-
-Hybrid PowerShell/Python design. Collects: OS info, installed software (registry), security registry settings, services, scheduled tasks, open ports, hotfixes/pending updates, local users.
-
-Install via `install.ps1` which registers a SYSTEM scheduled task.
-
-## Technology Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Frontend | Next.js 14, React, TypeScript |
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14, React, TypeScript, MUI |
 | Backend | Python 3.12, FastAPI, SQLAlchemy |
 | Database | PostgreSQL 16 |
-| Cache | Redis 7 |
-| Messaging | RabbitMQ 3.13 |
-| Storage | MinIO (S3-compatible) |
-| LLM (Security AI) | Local Ollama + Qwen 3.6 only |
+| Cache / Queue | Redis 7, RabbitMQ 3.13 |
+| Object storage | MinIO (S3-compatible) |
+| Security AI | Ollama + Qwen 3.6 (local only) |
 | Agents | Python, PowerShell |
 | CI/CD | GitHub Actions |
 | Orchestration | Docker Compose, Kubernetes |
+
+---
+
+## Security highlights
+
+- No hardcoded credentials — admin bootstrapped via `INIT_ADMIN_PASSWORD`
+- Startup secret validation in sandbox/production
+- CORS locked to explicit origins
+- Redis authentication required in sandbox
+- OpenAPI docs disabled in production
+- JWT on all API routes including ingestion
+- mTLS fail-closed for agents in protected environments
+
+---
 
 ## License
 

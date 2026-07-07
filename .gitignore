@@ -16,6 +16,11 @@ build/
 .env
 .env.local
 .env.*.local
+.env.sandbox
+.env.production
+.env.staging
+frontend/.env
+frontend/.env.local
 
 # IDE
 .idea/
@@ -53,6 +58,7 @@ minio-data/
 *.key
 *.crt
 secrets/
+k8s/secrets.yaml
 
 # Terraform
 .terraform/

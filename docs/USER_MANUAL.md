@@ -2,19 +2,24 @@
 
 Guide for SOC analysts, developers, and security managers using the VulnShield dashboard.
 
+![Dashboard overview](images/dashboard-overview.png)
+
 ## Getting Started
 
 ### Logging In
 
 1. Navigate to your VulnShield instance (e.g., http://localhost:3000)
-2. Enter your email and password
+2. Enter your username and password (provided by your administrator)
 3. If MFA is enabled, enter the TOTP code from your authenticator app
+4. Change your password if prompted on first login
 
-Default demo credentials: `admin@vulnshield.local` / `Admin@123456`
+> Credentials are set via `INIT_ADMIN_PASSWORD` at deployment. There are no default passwords in production or sandbox builds.
 
 ### Dashboard Overview
 
-The main dashboard provides an at-a-glance view of your security posture:
+The main dashboard provides an at-a-glance view of your security posture. Use **Quick Actions** to start scans or navigate to vulnerabilities.
+
+![Operations workflow](images/operations-workflow.png)
 
 - **Risk Score** — Composite score across all assets (0–100)
 - **Open Vulnerabilities** — Breakdown by severity (Critical, High, Medium, Low)

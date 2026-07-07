@@ -1,6 +1,8 @@
 # VulnShield Platform Architecture
 
-VulnShield is a cloud-native vulnerability management platform built as a microservices architecture. It provides asset discovery, vulnerability scanning, AI-assisted code review, red team simulation, patch intelligence, risk scoring, compliance mapping, and reporting.
+VulnShield is a cloud-native vulnerability management platform built as microservices. It provides asset discovery, vulnerability scanning, AI-assisted code review, red team simulation, patch intelligence, risk scoring, compliance mapping, and reporting.
+
+![Architecture overview](images/architecture-overview.png)
 
 ## High-Level Architecture
 

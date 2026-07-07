@@ -9,6 +9,8 @@ import React, {
   useState,
 } from 'react';
 import { authApi } from '@/lib/api';
+import { MOCK_ACCESS_TOKEN, mockLogin } from '@/lib/mock-data';
+import { isDemoModeEnabled } from '@/lib/env';
 import {
   clearStoredAuth,
   getStoredUserRaw,
@@ -48,6 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = getStoredToken();
     if (storedUser && token) {
       setUser(storedUser);
+      if (token === MOCK_ACCESS_TOKEN && isDemoModeEnabled()) {
+        setIsLoading(false);
+        return;
+      }
+      if (token === MOCK_ACCESS_TOKEN) {
+        clearStoredAuth();
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
       authApi.me().then(setUser).catch(() => {
         clearStoredAuth();
         setUser(null);
@@ -58,13 +70,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (credentials: LoginRequest) => {
-    const response = await authApi.login(credentials);
-    setStoredAuth(
-      response.access_token,
-      response.refresh_token,
-      JSON.stringify(response.user)
-    );
-    setUser(response.user);
+    try {
+      const response = await authApi.login(credentials);
+      setStoredAuth(
+        response.access_token,
+        response.refresh_token,
+        JSON.stringify(response.user)
+      );
+      setUser(response.user);
+    } catch (err) {
+      if (!isDemoModeEnabled()) {
+        throw err instanceof Error ? err : new Error('Login failed. Please check your credentials.');
+      }
+      const mock = mockLogin(credentials.username, credentials.password);
+      if (!mock) {
+        throw new Error('Login failed. Demo mode is enabled — check credentials in your local .env.local.');
+      }
+      setStoredAuth(mock.access_token, mock.refresh_token, JSON.stringify(mock.user));
+      setUser(mock.user);
+    }
   }, []);
 
   const logout = useCallback(async () => {

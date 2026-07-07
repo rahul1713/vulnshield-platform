@@ -14,6 +14,7 @@ import { Shield, LockOutlined } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/layout/AuthProvider';
+import { isDemoModeEnabled } from '@/lib/env';
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
@@ -117,9 +118,11 @@ export default function LoginPage() {
               </Button>
             </Box>
 
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3, textAlign: 'center' }}>
-              Default: admin / Admin@123456
-            </Typography>
+            {isDemoModeEnabled() && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3, textAlign: 'center' }}>
+                Local demo mode is enabled. Use credentials from your .env.local (never commit these).
+              </Typography>
+            )}
           </CardContent>
         </Card>
       </Box>

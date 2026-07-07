@@ -27,11 +27,21 @@ spec:
     metadata:
       labels:
         app: redis
+        app.kubernetes.io/part-of: vulnshield
     spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          args: ["redis-server", "--appendonly", "yes"]
+          command:
+            - sh
+            - -c
+            - exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vulnshield-secrets
+                  key: REDIS_PASSWORD
           ports:
             - containerPort: 6379
           volumeMounts:
@@ -39,7 +49,10 @@ spec:
               mountPath: /data
           readinessProbe:
             exec:
-              command: ["redis-cli", "ping"]
+              command:
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" ping
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:

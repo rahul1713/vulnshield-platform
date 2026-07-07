@@ -1,14 +1,16 @@
 'use client';
 
-import { Box } from '@mui/material';
+import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import {
   BugReport,
   CheckCircle,
+  PlayArrow,
   Radar,
   Storage,
   TrendingUp,
   Warning,
 } from '@mui/icons-material';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '@/lib/api';
 import { MOCK_DASHBOARD } from '@/lib/mock-data';
@@ -50,6 +52,25 @@ export function DashboardView({ title, subtitle, fetchKey }: DashboardViewProps)
   return (
     <>
       <PageHeader title={title} subtitle={subtitle} />
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Quick Actions
+          </Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <Button component={Link} href="/scans" variant="contained" startIcon={<PlayArrow />}>
+              New Vulnerability Scan
+            </Button>
+            <Button component={Link} href="/web-scanner" variant="outlined" startIcon={<Radar />}>
+              Start Web Scan
+            </Button>
+            <Button component={Link} href="/vulnerabilities" variant="outlined" startIcon={<BugReport />}>
+              View Vulnerabilities
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
 
       <StatCardsGrid>
         <StatCard

@@ -3,12 +3,13 @@
 import { Button } from '@mui/material';
 import { Security } from '@mui/icons-material';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { redTeamApi } from '@/lib/api';
-import { MOCK_RED_TEAM, paginate } from '@/lib/mock-data';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/SeverityChip';
+import { CreateRedTeamDialog } from '@/components/red-team/CreateRedTeamDialog';
+import { useToast } from '@/components/ui/ToastProvider';
 import { RedTeamCampaign } from '@/types';
 
 const columns: Column<RedTeamCampaign>[] = [
@@ -23,16 +24,24 @@ const columns: Column<RedTeamCampaign>[] = [
 export default function RedTeamPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ['red-team', page, pageSize],
-    queryFn: async () => {
-      try {
-        return await redTeamApi.list({ page: page + 1, page_size: pageSize });
-      } catch {
-        return paginate(MOCK_RED_TEAM, page + 1, pageSize);
-      }
+    queryFn: () => redTeamApi.list({ page: page + 1, page_size: pageSize }),
+    refetchInterval: 3000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: ({ name, description }: { name: string; description: string }) =>
+      redTeamApi.create(name, description),
+    onSuccess: () => {
+      showToast('Red team campaign launched', 'success');
+      queryClient.invalidateQueries({ queryKey: ['red-team'] });
     },
+    onError: (e: Error) => showToast(e.message, 'error'),
   });
 
   return (
@@ -40,7 +49,11 @@ export default function RedTeamPage() {
       <PageHeader
         title="AI Red Team"
         subtitle="Automated adversary simulation and attack path analysis"
-        action={<Button variant="contained" startIcon={<Security />}>New Campaign</Button>}
+        action={
+          <Button variant="contained" startIcon={<Security />} onClick={() => setDialogOpen(true)}>
+            New Campaign
+          </Button>
+        }
       />
       <DataTable
         columns={columns}
@@ -53,6 +66,13 @@ export default function RedTeamPage() {
         onPageSizeChange={setPageSize}
         searchPlaceholder="Search campaigns..."
         getRowId={(row) => row.id}
+      />
+      <CreateRedTeamDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={async (name, description) => {
+          await createMutation.mutateAsync({ name, description });
+        }}
       />
     </>
   );

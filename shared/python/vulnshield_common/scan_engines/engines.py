@@ -62,6 +62,8 @@ async def _run_cmd(cmd: list[str], timeout: float = 300.0) -> tuple[int, str, st
 
 async def httpx_probe(url: str, timeout: float = 15.0) -> dict[str, Any]:
     """HTTP probe using the httpx library (not ProjectDiscovery httpx)."""
+    from vulnshield_common.scan_sandbox import validate_target_or_raise
+    validate_target_or_raise(url)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False) as client:
         try:
             resp = await client.get(url)
@@ -168,6 +170,8 @@ async def run_nuclei(target: str, tags: list[str] | None = None, severity: str |
 
 async def run_nmap(target: str, top_ports: int = 100) -> dict[str, Any]:
     """Run nmap top-port scan with XML output."""
+    from vulnshield_common.scan_sandbox import validate_target_or_raise
+    validate_target_or_raise(target)
     require_engines("nmap")
     cmd = ["nmap", "-oX", "-", "--top-ports", str(top_ports), "-Pn", target]
     code, stdout, stderr = await _run_cmd(cmd, timeout=600.0)

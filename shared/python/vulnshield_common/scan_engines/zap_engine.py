@@ -9,8 +9,7 @@ from typing import Any
 import httpx
 import structlog
 
-from vulnshield_common.scan_engines.httpx_probe import probe_url
-from vulnshield_common.scan_engines.nuclei_engine import run_nuclei
+from vulnshield_common.scan_engines.engines import httpx_probe, run_nuclei
 from vulnshield_common.scan_sandbox import is_allowed_scan_target, sanitize_log_text
 
 logger = structlog.get_logger()
@@ -97,6 +96,8 @@ async def _run_zap_api(url: str, timeout: int) -> list[dict]:
 
 async def run_zap_scan(url: str, timeout: int | None = None) -> list[dict]:
     """Run ZAP scan when ZAP_BASE_URL is set; otherwise nuclei + httpx fallback."""
+    from vulnshield_common.scan_engines.engines import nuclei_to_web_finding
+
     timeout = timeout or DEFAULT_TIMEOUT
     if _zap_base_url():
         try:
@@ -104,6 +105,7 @@ async def run_zap_scan(url: str, timeout: int | None = None) -> list[dict]:
         except Exception as exc:
             logger.warning("zap_failed_fallback", url=url, error=sanitize_log_text(str(exc)))
 
-    nuclei_findings = await run_nuclei(url, timeout=min(timeout, 600))
-    probe = await probe_url(url)
-    return nuclei_findings + probe.get("findings", [])
+    nuclei_raw = await run_nuclei(url)
+    findings = [nuclei_to_web_finding(item, url) for item in nuclei_raw]
+    await httpx_probe(url)
+    return findings

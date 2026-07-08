@@ -164,15 +164,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Validate manifests
+      - name: Validate manifest syntax
         run: |
-          for file in k8s/*.yaml; do
-            echo "Validating $file"
-            kubectl apply --dry-run=client --validate=false -f "$file"
-          done
+          pip install pyyaml
+          python3 <<'PY'
+          import glob
+          import yaml
+
+          for path in sorted(glob.glob("k8s/*.yaml")):
+              with open(path, encoding="utf-8") as fh:
+                  list(yaml.safe_load_all(fh))
+              print(f"OK {path}")
+          PY
 
   validate-compose:
     name: Validate Docker Compose

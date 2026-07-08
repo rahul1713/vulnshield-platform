@@ -1,6 +1,5 @@
 """Collect installed security patches and pending updates."""
 
-import json
 import shutil
 import subprocess
 

@@ -151,7 +151,7 @@ jobs:
       - name: Build ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.service == 'linux-agent' && 'agents/linux' || matrix.service == 'frontend' && 'frontend' || '.' }}
+          context: ${{ matrix.service == 'linux-agent' && 'agents/linux' || matrix.service == 'frontend' && 'frontend' || matrix.service == 'api-gateway' && 'services/api-gateway' || '.' }}
           file: ${{ matrix.service == 'linux-agent' && 'agents/linux/Dockerfile' || matrix.service == 'frontend' && 'frontend/Dockerfile' || format('services/{0}/Dockerfile', matrix.service) }}
           push: false
           tags: vulnshield/${{ matrix.service }}:ci

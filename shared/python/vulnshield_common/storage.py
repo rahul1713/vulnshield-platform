@@ -1,6 +1,5 @@
 from io import BytesIO
 from minio import Minio
-from minio.error import S3Error
 
 from vulnshield_common.config import get_settings
 

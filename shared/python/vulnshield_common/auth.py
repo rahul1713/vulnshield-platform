@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnshield_common.config import get_settings

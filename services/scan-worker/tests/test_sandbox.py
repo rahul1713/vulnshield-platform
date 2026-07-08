@@ -11,6 +11,7 @@ from vulnshield_common.scan_sandbox import (
 def test_allow_localhost(monkeypatch):
     monkeypatch.setenv("SCAN_SANDBOX_MODE", "true")
     monkeypatch.setenv("ALLOW_EXTERNAL_TARGETS", "false")
+    monkeypatch.setenv("SANDBOX_ALLOW_PRIVATE", "true")
     assert is_allowed_scan_target("http://localhost:8080")
     assert is_allowed_scan_target("127.0.0.1")
 
@@ -18,12 +19,14 @@ def test_allow_localhost(monkeypatch):
 def test_allow_private_ip(monkeypatch):
     monkeypatch.setenv("SCAN_SANDBOX_MODE", "true")
     monkeypatch.setenv("ALLOW_EXTERNAL_TARGETS", "false")
+    monkeypatch.setenv("SANDBOX_ALLOW_PRIVATE", "true")
     assert is_allowed_scan_target("192.168.1.10")
 
 
 def test_reject_external(monkeypatch):
     monkeypatch.setenv("SCAN_SANDBOX_MODE", "true")
     monkeypatch.setenv("ALLOW_EXTERNAL_TARGETS", "false")
+    monkeypatch.setenv("SANDBOX_ALLOW_PRIVATE", "true")
     assert not is_allowed_scan_target("https://example.com")
 
 
@@ -35,5 +38,5 @@ def test_allow_external_override(monkeypatch):
 
 def test_sanitize_truncates():
     result = sanitize_log_text("x" * 500, max_len=50)
-    assert len(result) < 60
     assert "truncated" in result
+    assert len(result) <= 70

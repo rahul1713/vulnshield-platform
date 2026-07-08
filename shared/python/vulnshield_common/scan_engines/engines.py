@@ -139,6 +139,8 @@ async def crawl_urls(base_url: str, depth: int = 3, max_pages: int = 50) -> dict
 
 async def run_nuclei(target: str, tags: list[str] | None = None, severity: str | None = None) -> list[dict[str, Any]]:
     """Run nuclei with JSON output. Uses safe/passive tags by default."""
+    from vulnshield_common.scan_sandbox import validate_target_or_raise
+    validate_target_or_raise(target)
     require_engines("nuclei")
     cmd = ["nuclei", "-u", target, "-jsonl", "-silent", "-no-color"]
     if tags:
@@ -167,7 +169,7 @@ async def run_nuclei(target: str, tags: list[str] | None = None, severity: str |
 async def run_nmap(target: str, top_ports: int = 100) -> dict[str, Any]:
     """Run nmap top-port scan with XML output."""
     require_engines("nmap")
-    cmd = ["nmap", "-oX", "-", f"--top-ports", str(top_ports), "-Pn", target]
+    cmd = ["nmap", "-oX", "-", "--top-ports", str(top_ports), "-Pn", target]
     code, stdout, stderr = await _run_cmd(cmd, timeout=600.0)
     if code != 0:
         raise EngineUnavailableError(f"nmap failed (exit {code}): {stderr[:500]}")

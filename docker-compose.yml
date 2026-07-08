@@ -128,39 +128,6 @@ services:
   ollama-init:
     image: curlimages/curl:8.5.0
     container_name: vulnshield-ollama-init
-    depends_on:
-      ollama:
-        condition: service_started
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Waiting for Ollama..."
-        until curl -sf http://ollama:11434/api/tags >/dev/null; do sleep 3; done
-        echo "Pulling qwen3.6 model..."
-        curl -sf http://ollama:11434/api/pull -d '{"name":"qwen3.6"}'
-        echo "Ollama model pull complete."
-    networks:
-      - vulnshield-net
-    profiles:
-      - ai
-    restart: "no"
-
-  zap:
-    image: ghcr.io/zaproxy/zaproxy:stable
-    container_name: vulnshield-zap
-    command: >
-      zap.sh -daemon -host 0.0.0.0 -port 8080
-      -config api.disablekey=true
-      -config api.addrs.addr.name=.*
-      -config api.addrs.addr.regex=true
-    networks:
-      - vulnshield-net
-    profiles:
-      - scanning
-
-  ollama-init:
-    image: curlimages/curl:latest
-    container_name: vulnshield-ollama-init
     environment:
       OLLAMA_HOST: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.6}
@@ -179,7 +146,11 @@ services:
   zap:
     image: ghcr.io/zaproxy/zaproxy:stable
     container_name: vulnshield-zap
-    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port 8080
+      -config api.disablekey=true
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
     ports:
       - "8090:8080"
     healthcheck:

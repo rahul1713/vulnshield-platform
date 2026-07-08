@@ -29,7 +29,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def is_scan_sandbox_mode() -> bool:
-    return _env_bool("SCAN_SANDBOX_MODE", default=True)
+    return _env_bool("SCAN_SANDBOX_MODE", default=False)
 
 
 def allow_external_targets() -> bool:
@@ -40,7 +40,7 @@ def allow_external_targets() -> bool:
 
 
 def sandbox_allow_private() -> bool:
-    return _env_bool("SANDBOX_ALLOW_PRIVATE", default=True)
+    return _env_bool("SANDBOX_ALLOW_PRIVATE", default=False)
 
 
 def allow_simulated_scans() -> bool:

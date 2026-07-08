@@ -14,11 +14,11 @@ from vulnshield_common.scan_engines.engines import (
     run_nuclei,
     run_semgrep,
 )
-from vulnshield_common.scan_engines.sandbox import (
-    sanitize_for_log,
+from vulnshield_common.scan_sandbox import (
+    sanitize_log_text as sanitize_for_log,
     truncate_for_storage,
+    validate_target_or_raise as validate_scan_target,
 )
-from vulnshield_common.scan_sandbox import validate_target_or_raise as validate_scan_target
 
 # Alias used by some handlers
 probe_url = httpx_probe

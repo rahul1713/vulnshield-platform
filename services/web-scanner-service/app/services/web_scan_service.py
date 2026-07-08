@@ -1,14 +1,17 @@
 import json
-import os
 from uuid import UUID
 from urllib.parse import urlparse
 
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from vulnshield_common.config import get_settings
 from vulnshield_common.messaging import publish_event
-from vulnshield_common.scan_sandbox import allow_simulated_scans, validate_scan_config_or_raise, validate_target_or_raise
+from vulnshield_common.scan_sandbox import (
+    allow_simulated_scans,
+    is_scan_sandbox_mode,
+    validate_scan_config_or_raise,
+    validate_target_or_raise,
+)
 from vulnshield_common.scan_engines import (
     EngineUnavailableError,
     OWASP_NUCLEI_TAGS,
@@ -34,13 +37,11 @@ OWASP_TESTS = {
 
 
 def _allow_simulated() -> bool:
-    settings = get_settings()
-    return settings.allow_simulated_scans or os.getenv("ALLOW_SIMULATED_SCANS", "").lower() in ("1", "true", "yes")
+    return allow_simulated_scans()
 
 
 def _use_real_engines() -> bool:
-    settings = get_settings()
-    return settings.scan_sandbox_mode or os.getenv("SCAN_SANDBOX_MODE", "").lower() in ("1", "true", "yes")
+    return is_scan_sandbox_mode()
 
 
 def _engine_unavailable_detail(exc: Exception) -> str:
@@ -51,10 +52,10 @@ def _engine_unavailable_detail(exc: Exception) -> str:
     )
 
 async def create_web_scan(db: AsyncSession, data: dict, user_id: UUID | None = None):
-    validate_target_or_raise(data["target_url"], field="target_url")
     parsed = urlparse(data["target_url"])
     if parsed.scheme not in ("http", "https"):
         raise HTTPException(400, "target_url must be http or https")
+    validate_target_or_raise(data["target_url"], field="target_url")
     validate_scan_config_or_raise({"target_url": data["target_url"]})
     r = await db.execute(
         text("""

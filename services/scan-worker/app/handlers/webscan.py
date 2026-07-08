@@ -10,22 +10,19 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnshield_common.messaging import publish_event
-from vulnshield_common.scan_engines import nuclei_to_web_finding, probe_url, run_nuclei
-from vulnshield_common.scan_sandbox import sanitize_log_text, truncate_for_storage
+from vulnshield_common.scan_engines import httpx_probe, nuclei_to_web_finding, run_nuclei
+from vulnshield_common.scan_sandbox import is_allowed_scan_target, sanitize_log_text, truncate_for_storage
 
 logger = structlog.get_logger()
-
-_SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
 
 def _count_severities(findings: list[dict]) -> dict[str, int]:
     counts = {"critical_count": 0, "high_count": 0, "medium_count": 0, "low_count": 0, "info_count": 0}
     for f in findings:
         sev = f.get("severity", "info")
-        key = f"{sev}_count" if sev != "critical" else "critical_count"
         if sev == "critical":
             counts["critical_count"] += 1
-        elif sev in ("high", "medium", "low", "info"):
+        elif sev in counts:
             counts[f"{sev}_count"] += 1
     return counts
 
@@ -56,16 +53,22 @@ async def handle_webscan_started(db: AsyncSession, payload: dict) -> None:
         await publish_event("webscan.completed", {"scan_id": str(scan_id), "findings": 0, "error": "missing_target"})
         return
 
+    if not is_allowed_scan_target(target_url):
+        await db.execute(
+            text("UPDATE scans SET status = 'failed', error_message = :err, completed_at = NOW() WHERE id = :id"),
+            {"id": str(scan_id), "err": "Target not allowed in sandbox mode"},
+        )
+        await publish_event("webscan.completed", {"scan_id": str(scan_id), "findings": 0, "error": "target_blocked"})
+        return
+
     all_findings: list[dict] = []
     error_msg: str | None = None
 
     try:
-        from vulnshield_common.scan_engines.sandbox import validate_scan_target
-        validate_scan_target(target_url)
         raw_nuclei = await run_nuclei(target_url)
         for item in raw_nuclei:
             all_findings.append(nuclei_to_web_finding(item, target_url))
-        probe = await probe_url(target_url)
+        probe = await httpx_probe(target_url)
         if probe.get("status_code", 0) >= 400:
             all_findings.append({
                 "url": target_url,
@@ -74,7 +77,7 @@ async def handle_webscan_started(db: AsyncSession, payload: dict) -> None:
                 "severity": "low",
                 "title": f"HTTP {probe.get('status_code')} response",
                 "description": f"Probe returned status {probe.get('status_code')}",
-                "proof": sanitize_for_log(str(probe.get("headers", {}))[:500]),
+                "proof": sanitize_log_text(str(probe.get("headers", {}))[:500]),
                 "remediation": "Review HTTP error handling and security headers.",
             })
     except Exception as exc:

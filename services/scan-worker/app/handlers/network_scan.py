@@ -10,8 +10,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnshield_common.messaging import publish_event
-from vulnshield_common.scan_engines import run_nmap
-from vulnshield_common.scan_sandbox import sanitize_log_text, truncate_for_storage
+from vulnshield_common.scan_engines import nmap_to_vulnerabilities, run_nmap
+from vulnshield_common.scan_sandbox import is_allowed_scan_target, sanitize_log_text, truncate_for_storage
 
 logger = structlog.get_logger()
 
@@ -34,7 +34,7 @@ async def _resolve_target(db: AsyncSession, scan_id: UUID, config: dict | None) 
 
     if not target and asset_id:
         asset_row = await db.execute(
-            text("SELECT ip_address::text, hostname, fqdn FROM assets WHERE id = :id"),
+            text("SELECT host(ip_address) AS ip_address, hostname, fqdn FROM assets WHERE id = :id"),
             {"id": str(asset_id)},
         )
         asset = asset_row.fetchone()
@@ -44,7 +44,7 @@ async def _resolve_target(db: AsyncSession, scan_id: UUID, config: dict | None) 
     return target, asset_id
 
 
-def _severity_for_port(port: int, service: str) -> str:
+def _severity_for_port(port: int, service: str | None) -> str:
     risky_ports = {21, 22, 23, 25, 110, 135, 139, 445, 1433, 3306, 3389, 5432, 5900, 6379, 27017}
     if port in risky_ports:
         return "high"
@@ -78,6 +78,14 @@ async def handle_network_scan(db: AsyncSession, payload: dict) -> None:
         await publish_event("scan.completed", {"scan_id": str(scan_id), "error": "missing_target"})
         return
 
+    if not is_allowed_scan_target(target):
+        await db.execute(
+            text("UPDATE scans SET status = 'failed', error_message = :err, completed_at = NOW() WHERE id = :id"),
+            {"id": str(scan_id), "err": "Target not allowed in sandbox mode"},
+        )
+        await publish_event("scan.completed", {"scan_id": str(scan_id), "error": "target_blocked"})
+        return
+
     if not asset_id:
         is_ip = _looks_like_ip(target)
         asset_row = await db.execute(
@@ -99,62 +107,69 @@ async def handle_network_scan(db: AsyncSession, payload: dict) -> None:
             {"aid": str(asset_id), "id": str(scan_id)},
         )
 
-    findings: list[dict] = []
+    vuln_findings: list[dict] = []
     error_msg: str | None = None
+    nmap_result: dict = {}
     try:
-        findings = await run_nmap(target)
+        nmap_result = await run_nmap(target)
+        vuln_findings = nmap_to_vulnerabilities(nmap_result, str(asset_id))
     except Exception as exc:
         error_msg = sanitize_log_text(str(exc), 500)
         logger.error("nmap_scan_failed", scan_id=str(scan_id), target=target, error=error_msg)
 
     sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
-    for f in findings:
-        port = f["port"]
-        service = f.get("service_name", "unknown")
-        sev = _severity_for_port(port, service)
-        sev_counts[sev] += 1
+    for host in nmap_result.get("hosts", []):
+        for port_info in host.get("ports", []):
+            if port_info.get("state") != "open":
+                continue
+            port = port_info["port"]
+            service = port_info.get("service") or "unknown"
+            await db.execute(
+                text("""
+                    INSERT INTO asset_ports (asset_id, port, protocol, service_name, service_version, state)
+                    VALUES (:aid, :port, :proto, :svc, :ver, 'open')
+                    ON CONFLICT (asset_id, port, protocol) DO UPDATE
+                    SET service_name = EXCLUDED.service_name, service_version = EXCLUDED.service_version
+                """),
+                {
+                    "aid": str(asset_id),
+                    "port": port,
+                    "proto": port_info.get("protocol", "tcp"),
+                    "svc": service,
+                    "ver": port_info.get("version"),
+                },
+            )
 
-        await db.execute(
-            text("""
-                INSERT INTO asset_ports (asset_id, port, protocol, service_name, service_version, state)
-                VALUES (:aid, :port, :proto, :svc, :ver, 'open')
-                ON CONFLICT (asset_id, port, protocol) DO UPDATE
-                SET service_name = EXCLUDED.service_name, service_version = EXCLUDED.service_version
-            """),
-            {
-                "aid": str(asset_id),
-                "port": port,
-                "proto": f.get("protocol", "tcp"),
-                "svc": service,
-                "ver": f.get("service_version") or None,
-            },
-        )
-
+    for f in vuln_findings:
+        sev = _severity_for_port(f.get("port") or 0, f.get("affected_software"))
+        sev_counts[sev] = sev_counts.get(sev, 0) + 1
         await db.execute(
             text("""
                 INSERT INTO vulnerabilities (
                     asset_id, scan_id, title, description, severity, port, protocol,
-                    affected_software, proof, remediation, category, status
+                    affected_software, affected_version, proof, remediation, category, status, metadata
                 ) VALUES (
                     :aid, :sid, :title, :desc, :sev, :port, :proto,
-                    :sw, :proof, :rem, 'network', 'open'
+                    :sw, :ver, :proof, :rem, 'network', 'open', CAST(:meta AS jsonb)
                 )
             """),
             {
                 "aid": str(asset_id),
                 "sid": str(scan_id),
-                "title": f.get("title", f"Open port {port}")[:500],
+                "title": f.get("title", "Open port")[:500],
                 "desc": truncate_for_storage(f.get("description")),
                 "sev": sev,
-                "port": port,
+                "port": f.get("port"),
                 "proto": f.get("protocol", "tcp"),
-                "sw": service,
-                "proof": truncate_for_storage(f"service={service} version={f.get('service_version', '')}"),
+                "sw": f.get("affected_software"),
+                "ver": f.get("affected_version"),
+                "proof": truncate_for_storage(f.get("proof")),
                 "rem": "Close unused ports or restrict access via firewall rules.",
+                "meta": json.dumps(f.get("metadata") or {"engine": "nmap"}),
             },
         )
 
-    total = len(findings)
+    total = len(vuln_findings)
     status = "failed" if error_msg and total == 0 else "completed"
     await db.execute(
         text("""

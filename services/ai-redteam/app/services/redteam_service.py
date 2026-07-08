@@ -1,5 +1,4 @@
 import json
-import os
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -8,7 +7,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnshield_common.ai_orchestrator import plan_scan, sanitize_for_llm, triage_findings
-from vulnshield_common.config import get_settings
 from vulnshield_common.entity_reports import generate_redteam_executive_report
 from vulnshield_common.llm import SecurityLLMConfigurationError, get_security_llm
 from vulnshield_common.messaging import publish_event
@@ -20,11 +18,11 @@ from vulnshield_common.scan_engines import (
     run_nmap,
     run_nuclei,
 )
+from vulnshield_common.scan_sandbox import allow_simulated_scans, validate_target_or_raise
 
 
 def _allow_simulated() -> bool:
-    settings = get_settings()
-    return settings.allow_simulated_scans or os.getenv("ALLOW_SIMULATED_SCANS", "").lower() in ("1", "true", "yes")
+    return allow_simulated_scans()
 
 
 def _allowed_targets(scope: dict) -> list[str]:
@@ -39,6 +37,11 @@ async def _execute_safe_checks(targets: list[str]) -> list[dict]:
     """Run sandbox-safe recon checks and return raw observations."""
     observations: list[dict] = []
     for target in targets[:10]:
+        try:
+            validate_target_or_raise(target, field="target")
+        except HTTPException:
+            observations.append({"check": "target_validation", "target": target, "error": "target not allowed in sandbox"})
+            continue
         host = target
         if target.startswith("http"):
             parsed = urlparse(target)

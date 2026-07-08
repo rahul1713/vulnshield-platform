@@ -9,7 +9,7 @@ import { isDemoSession } from '@/lib/api-client-helpers';
 import { waitForDemoReportInput } from '@/lib/demo-helpers';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/SeverityChip';
+import { StatusChip, SimulatedBadge } from '@/components/ui/SeverityChip';
 import { CreateRedTeamDialog } from '@/components/red-team/CreateRedTeamDialog';
 import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -17,7 +17,17 @@ import { RedTeamCampaign } from '@/types';
 import { Stack } from '@mui/material';
 
 const columns: Column<RedTeamCampaign>[] = [
-  { id: 'name', label: 'Campaign', sortable: true },
+  {
+    id: 'name',
+    label: 'Campaign',
+    sortable: true,
+    render: (row) => (
+      <>
+        {row.name}
+        {row.findings_simulated && <SimulatedBadge />}
+      </>
+    ),
+  },
   { id: 'description', label: 'Description', getValue: (row) => row.description || '—' },
   { id: 'status', label: 'Status', render: (row) => <StatusChip status={row.status} /> },
   { id: 'findings_count', label: 'Findings', sortable: true },

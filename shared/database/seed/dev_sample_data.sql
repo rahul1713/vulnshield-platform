@@ -1,19 +1,5 @@
--- VulnShield Platform - Seed Data
-
--- Roles with RBAC permissions (no default admin user — created via INIT_ADMIN_PASSWORD at auth-service startup)
-INSERT INTO roles (id, name, description, permissions) VALUES
-('a0000000-0000-0000-0000-000000000001', 'administrator', 'Full system access',
- '["*"]'),
-('a0000000-0000-0000-0000-000000000002', 'security_manager', 'Manage security operations',
- '["assets:read","assets:write","scans:read","scans:write","vulnerabilities:read","vulnerabilities:write","reports:read","reports:write","compliance:read","compliance:write","dashboard:read","users:read"]'),
-('a0000000-0000-0000-0000-000000000003', 'soc_analyst', 'SOC operations and triage',
- '["assets:read","scans:read","scans:write","vulnerabilities:read","vulnerabilities:write","reports:read","dashboard:read","redteam:read"]'),
-('a0000000-0000-0000-0000-000000000004', 'developer', 'Code review and remediation',
- '["assets:read","vulnerabilities:read","vulnerabilities:write","codereview:read","codereview:write","dashboard:read"]'),
-('a0000000-0000-0000-0000-000000000005', 'auditor', 'Audit and compliance review',
- '["assets:read","vulnerabilities:read","reports:read","compliance:read","audit:read","dashboard:read"]'),
-('a0000000-0000-0000-0000-000000000006', 'read_only', 'Read-only access',
- '["assets:read","vulnerabilities:read","reports:read","dashboard:read"]');
+-- VulnShield Platform - Development sample data (NOT loaded in sandbox/production)
+-- Load manually: make seed
 
 -- Sample CVEs
 INSERT INTO cves (cve_id, description, cvss_v3_score, cvss_v3_vector, epss_score, is_kev, published_date, cwe_ids, cpes) VALUES
@@ -66,23 +52,13 @@ INSERT INTO vulnerabilities (asset_id, cve_identifier, title, description, sever
 ('c0000000-0000-0000-0000-000000000001', NULL, 'Missing Security Headers', 'Web server missing HSTS, CSP, and X-Frame-Options headers', 'medium', 4.3, NULL, 'open', 'misconfiguration', 'nginx', '1.18.0', 'Add security headers to nginx configuration', FALSE, FALSE, 38.5),
 ('c0000000-0000-0000-0000-000000000008', NULL, 'End-of-Life Operating System', 'Windows Server 2016 reached end of extended support', 'high', 7.0, NULL, 'risk_accepted', 'unsupported_software', 'Windows Server', '2016', 'Migrate to Windows Server 2022', FALSE, FALSE, 65.0);
 
--- Compliance frameworks
-INSERT INTO compliance_frameworks (id, name, version, description) VALUES
-('d0000000-0000-0000-0000-000000000001', 'CIS Controls', 'v8', 'Center for Internet Security Critical Security Controls'),
-('d0000000-0000-0000-0000-000000000002', 'NIST CSF', '2.0', 'NIST Cybersecurity Framework'),
-('d0000000-0000-0000-0000-000000000003', 'NIST 800-53', 'Rev 5', 'NIST Special Publication 800-53'),
-('d0000000-0000-0000-0000-000000000004', 'ISO 27001', '2022', 'Information Security Management'),
-('d0000000-0000-0000-0000-000000000005', 'PCI DSS', '4.0', 'Payment Card Industry Data Security Standard'),
-('d0000000-0000-0000-0000-000000000006', 'SOC 2', '2017', 'Service Organization Control 2'),
-('d0000000-0000-0000-0000-000000000007', 'HIPAA', '2013', 'Health Insurance Portability and Accountability Act');
-
 -- Notification rules
 INSERT INTO notification_rules (name, event_type, severity_threshold, channels, recipients, is_active) VALUES
 ('Critical Vulnerability Alert', 'vulnerability.detected', 'critical', '["email","slack"]', '["security-team@corp.local"]', TRUE),
 ('Failed Scan Alert', 'scan.failed', NULL, '["email"]', '["soc@corp.local"]', TRUE),
 ('New Asset Discovery', 'asset.discovered', NULL, '["slack"]', '["#security-alerts"]', TRUE);
 
--- Knowledge base entries
-INSERT INTO knowledge_base (title, category, content, tags, cve_ids, created_by) VALUES
-('Log4Shell Remediation Guide', 'remediation', 'Step-by-step guide to identify and remediate Log4Shell (CVE-2021-44228) across Java applications. 1. Identify affected versions. 2. Upgrade to 2.17.1+. 3. Apply WAF rules as temporary mitigation.', '["log4j","rce","java"]', '["CVE-2021-44228"]', 'b0000000-0000-0000-0000-000000000001'),
-('HTTP/2 Rapid Reset Mitigation', 'remediation', 'Mitigate CVE-2023-44487 by upgrading web servers and applying rate limiting for HTTP/2 connections.', '["http2","dos","nginx"]', '["CVE-2023-44487"]', 'b0000000-0000-0000-0000-000000000001');
+-- Knowledge base entries (requires a user — skip created_by FK or use NULL)
+INSERT INTO knowledge_base (title, category, content, tags, cve_ids) VALUES
+('Log4Shell Remediation Guide', 'remediation', 'Step-by-step guide to identify and remediate Log4Shell (CVE-2021-44228) across Java applications. 1. Identify affected versions. 2. Upgrade to 2.17.1+. 3. Apply WAF rules as temporary mitigation.', '["log4j","rce","java"]', '["CVE-2021-44228"]'),
+('HTTP/2 Rapid Reset Mitigation', 'remediation', 'Mitigate CVE-2023-44487 by upgrading web servers and applying rate limiting for HTTP/2 connections.', '["http2","dos","nginx"]', '["CVE-2023-44487"]');

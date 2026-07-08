@@ -8,7 +8,28 @@ import {
   SearchResult,
   SeverityDistribution,
 } from '@/types';
+import { canUseDemoFallback } from '@/lib/api-client-helpers';
 import { MOCK_DASHBOARD } from '@/lib/mock-data';
+
+const EMPTY_DASHBOARD: DashboardData = {
+  stats: {
+    total_assets: 0,
+    total_vulnerabilities: 0,
+    critical_vulnerabilities: 0,
+    high_vulnerabilities: 0,
+    open_vulnerabilities: 0,
+    resolved_this_month: 0,
+    active_scans: 0,
+    compliance_score: 0,
+    mean_time_to_remediate_days: 0,
+    risk_score: 0,
+  },
+  severity_distribution: [],
+  risk_trends: [],
+  remediation_progress: [],
+  risk_heatmap: [],
+  compliance_scores: [],
+};
 
 export function normalizePaginated<T>(
   data: unknown,
@@ -39,14 +60,16 @@ export function normalizePaginated<T>(
 }
 
 export function normalizeDashboard(data: unknown): DashboardData {
-  if (!data || typeof data !== 'object') return MOCK_DASHBOARD;
+  const demoFallback = canUseDemoFallback() ? MOCK_DASHBOARD : EMPTY_DASHBOARD;
+
+  if (!data || typeof data !== 'object') return demoFallback;
   const d = data as Record<string, unknown>;
 
   if ('stats' in d && d.stats) {
     return d as unknown as DashboardData;
   }
 
-  const severity = (d.severity_distribution as SeverityDistribution[]) ?? MOCK_DASHBOARD.severity_distribution;
+  const severity = (d.severity_distribution as SeverityDistribution[]) ?? demoFallback.severity_distribution;
 
   const riskTrendRaw = (d.risk_trend ?? d.risk_trends) as Array<Record<string, unknown>> | undefined;
   const risk_trends: RiskTrendPoint[] = riskTrendRaw?.length
@@ -57,9 +80,9 @@ export function normalizeDashboard(data: unknown): DashboardData {
         medium: Number(p.medium ?? 0),
         overall_risk: Number(p.overall_risk ?? p.count ?? 0),
       }))
-    : MOCK_DASHBOARD.risk_trends;
+    : demoFallback.risk_trends;
 
-  let remediation_progress: RemediationProgress[] = MOCK_DASHBOARD.remediation_progress;
+  let remediation_progress: RemediationProgress[] = demoFallback.remediation_progress;
   const rem = d.remediation_progress;
   if (Array.isArray(rem)) {
     remediation_progress = rem as RemediationProgress[];
@@ -77,11 +100,13 @@ export function normalizeDashboard(data: unknown): DashboardData {
         { asset: String(a.name ?? a.hostname ?? 'Asset'), category: 'Vulnerabilities', value: Number(a.vulnerability_count ?? a.vuln_count ?? 0) * 5 },
         { asset: String(a.name ?? a.hostname ?? 'Asset'), category: 'Risk', value: Number(a.max_risk ?? 0) },
       ])
-    : MOCK_DASHBOARD.risk_heatmap;
+    : demoFallback.risk_heatmap;
 
   const compliance_scores: ComplianceScorePoint[] =
     (d.compliance_scores as ComplianceScorePoint[]) ??
-    [{ framework: 'Overall', score: Number(d.compliance_score ?? 75) }];
+    (canUseDemoFallback()
+      ? [{ framework: 'Overall', score: Number(d.compliance_score ?? 75) }]
+      : []);
 
   return {
     stats: {
@@ -93,7 +118,7 @@ export function normalizeDashboard(data: unknown): DashboardData {
       resolved_this_month: Number(d.resolved_count ?? d.resolved_this_month ?? 0),
       active_scans: Number(d.active_scans ?? 0),
       compliance_score: Number(d.compliance_score ?? 0),
-      mean_time_to_remediate_days: Number(d.mean_time_to_remediate_days ?? 14),
+      mean_time_to_remediate_days: Number(d.mean_time_to_remediate_days ?? 0),
       risk_score: Number(d.risk_score ?? 0),
     },
     severity_distribution: severity,

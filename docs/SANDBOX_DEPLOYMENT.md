@@ -10,7 +10,8 @@ Hardened deployment for **staging, POC, and isolated security labs**. No hardcod
 |---------|----------------|
 | No default admin password | Admin created from `INIT_ADMIN_PASSWORD` env var at first boot |
 | Demo/mock mode disabled | `NEXT_PUBLIC_ENABLE_DEMO_MODE=false` (build-time) |
-| No silent mock API fallbacks | Frontend throws errors when API is unavailable |
+| No demo corp.local seed data | Only RBAC roles + compliance frameworks load at init; run `make seed` for dev sample data only |
+| No silent mock chart fallbacks | Dashboard charts stay empty when API returns no data (unless demo mode is on) |
 | Secret validation | Services exit on startup if weak/default secrets detected |
 | CORS locked down | Explicit `CORS_ORIGINS` required in sandbox |
 | Redis auth | `--requirepass` enforced in sandbox |
@@ -82,5 +83,7 @@ npm run dev
 
 - Sandbox uses dedicated Docker volumes / K8s PVCs
 - No production data should be mounted into sandbox
-- AI features use local Ollama only — source code sent to LLM stays in your network
+- Fresh Postgres init loads schema + RBAC roles only — **not** fake corp.local assets or vulnerabilities (`make seed` is development-only)
+- Web scanner and red team stub engines mark findings as **simulated** when real scanning/LLM is unavailable
+- AI features use local Ollama (`make sandbox-up` includes the `ai` profile) — source code sent to LLM stays in your network
 - Audit logs record actions but never passwords or tokens

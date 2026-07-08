@@ -461,6 +461,7 @@ CREATE TABLE red_team_campaigns (
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     executive_summary TEXT,
+    findings_simulated BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -478,6 +479,7 @@ CREATE TABLE red_team_findings (
     proof TEXT,
     remediation TEXT,
     attack_chain_step INT,
+    is_simulated BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -565,6 +567,7 @@ CREATE TABLE web_scan_findings (
     response TEXT,
     remediation TEXT,
     cwe_id VARCHAR(20),
+    is_simulated BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

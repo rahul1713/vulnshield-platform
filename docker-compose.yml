@@ -30,6 +30,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./shared/database/init:/docker-entrypoint-initdb.d:ro
+      - ./shared/database/seed:/seed:ro
+      - ./shared/database/migrations:/migrations:ro
     ports:
       - "5432:5432"
     healthcheck:

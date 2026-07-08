@@ -79,6 +79,7 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
     chains: list = []
     mappings: list = []
     findings: list = []
+    used_static_fallback = False
 
     try:
         llm = get_local_security_llm_provider()
@@ -96,6 +97,7 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
         summary = result.get("executive_summary")
     except (SecurityLLMConfigurationError, Exception):
         findings = STATIC_REDTEAM_FINDINGS
+        used_static_fallback = True
         chains = [{"phase": "Reconnaissance", "technique": "T1595", "description": "External footprinting"}]
         mappings = [{"tactic": "Initial Access", "technique": "T1566"}]
         summary = None
@@ -118,8 +120,8 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
         await db.execute(
             text("""
                 INSERT INTO red_team_findings (campaign_id, title, description, severity, attack_phase,
-                    mitre_technique_id, mitre_tactic, kill_chain_phase, proof, remediation, attack_chain_step)
-                VALUES (:cid, :title, :desc, :sev, :phase, :tech, :tactic, :kc, :proof, :rem, :step)
+                    mitre_technique_id, mitre_tactic, kill_chain_phase, proof, remediation, attack_chain_step, is_simulated)
+                VALUES (:cid, :title, :desc, :sev, :phase, :tech, :tactic, :kc, :proof, :rem, :step, :sim)
             """),
             {
                 "cid": str(campaign_id),
@@ -133,6 +135,7 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
                 "proof": f.get("proof"),
                 "rem": f.get("remediation"),
                 "step": i + 1,
+                "sim": used_static_fallback,
             },
         )
         count += 1
@@ -146,9 +149,9 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
     await db.execute(
         text("""
             UPDATE red_team_campaigns SET status = 'completed', findings_count = :fc,
-                completed_at = NOW(), executive_summary = :summary WHERE id = :id
+                completed_at = NOW(), executive_summary = :summary, findings_simulated = :sim WHERE id = :id
         """),
-        {"id": str(campaign_id), "fc": count, "summary": summary},
+        {"id": str(campaign_id), "fc": count, "summary": summary, "sim": used_static_fallback},
     )
     await publish_event("redteam.completed", {"campaign_id": str(campaign_id), "findings": count})
 
@@ -169,7 +172,7 @@ async def get_campaign(db: AsyncSession, campaign_id: UUID):
     r = await db.execute(
         text("""
             SELECT id, name, description, status::text, scope, attack_chains, mitre_mappings,
-                   findings_count, executive_summary, started_at, completed_at, created_at
+                   findings_count, executive_summary, findings_simulated, started_at, completed_at, created_at
             FROM red_team_campaigns WHERE id = :id
         """),
         {"id": str(campaign_id)},
@@ -183,7 +186,7 @@ async def get_campaign(db: AsyncSession, campaign_id: UUID):
 async def list_campaigns(db: AsyncSession, limit=50, offset=0):
     r = await db.execute(
         text("""
-            SELECT id, name, description, status::text, findings_count, created_at
+            SELECT id, name, description, status::text, findings_count, findings_simulated, created_at
             FROM red_team_campaigns ORDER BY created_at DESC LIMIT :limit OFFSET :offset
         """),
         {"limit": limit, "offset": offset},
@@ -195,7 +198,7 @@ async def list_findings(db: AsyncSession, campaign_id: UUID):
     r = await db.execute(
         text("""
             SELECT id, title, description, severity::text, attack_phase, mitre_technique_id,
-                   mitre_tactic, kill_chain_phase, proof, remediation, attack_chain_step, created_at
+                   mitre_tactic, kill_chain_phase, proof, remediation, attack_chain_step, is_simulated, created_at
             FROM red_team_findings WHERE campaign_id = :cid ORDER BY attack_chain_step
         """),
         {"cid": str(campaign_id)},

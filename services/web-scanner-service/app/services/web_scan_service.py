@@ -94,8 +94,8 @@ async def run_owasp_tests(db: AsyncSession, scan_id: UUID, tests: list[str]):
         owasp, title = meta
         await db.execute(
             text("""
-                INSERT INTO web_scan_findings (scan_id, url, vulnerability_type, owasp_category, severity, title, description, remediation)
-                VALUES (:sid, :url, :vtype, :owasp, 'medium', :title, :desc, :rem)
+                INSERT INTO web_scan_findings (scan_id, url, vulnerability_type, owasp_category, severity, title, description, remediation, is_simulated)
+                VALUES (:sid, :url, :vtype, :owasp, 'medium', :title, :desc, :rem, TRUE)
             """),
             {
                 "sid": str(scan_id),
@@ -120,7 +120,7 @@ async def list_findings(db: AsyncSession, scan_id: UUID):
     r = await db.execute(
         text("""
             SELECT id, url, parameter, method, vulnerability_type, owasp_category, severity::text,
-                   title, description, proof, remediation, cwe_id, created_at
+                   title, description, proof, remediation, cwe_id, is_simulated, created_at
             FROM web_scan_findings WHERE scan_id = :sid ORDER BY created_at DESC
         """),
         {"sid": str(scan_id)},

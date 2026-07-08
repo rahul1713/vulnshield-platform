@@ -222,6 +222,7 @@ export interface WebScanFinding {
   title: string;
   description?: string;
   remediation?: string;
+  is_simulated?: boolean;
   created_at: string;
 }
 
@@ -244,6 +245,7 @@ export interface RedTeamCampaign {
   description?: string;
   status: ScanStatus;
   findings_count: number;
+  findings_simulated?: boolean;
   created_by?: string;
   started_at?: string;
   completed_at?: string;

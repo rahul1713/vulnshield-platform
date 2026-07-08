@@ -7,14 +7,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { webScannerApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, Column } from '@/components/ui/DataTable';
-import { SeverityChip } from '@/components/ui/SeverityChip';
+import { SeverityChip, SimulatedBadge } from '@/components/ui/SeverityChip';
 import { StartWebScanDialog } from '@/components/web-scanner/StartWebScanDialog';
 import { ReportDownloadButton } from '@/components/reports/ReportDownloadButton';
 import { useToast } from '@/components/ui/ToastProvider';
 import { WebScanFinding } from '@/types';
 
 const columns: Column<WebScanFinding>[] = [
-  { id: 'title', label: 'Finding', sortable: true },
+  {
+    id: 'title',
+    label: 'Finding',
+    sortable: true,
+    render: (row) => (
+      <>
+        {row.title}
+        {row.is_simulated && <SimulatedBadge />}
+      </>
+    ),
+  },
   { id: 'url', label: 'URL' },
   { id: 'vulnerability_type', label: 'Type' },
   { id: 'owasp_category', label: 'OWASP', getValue: (row) => row.owasp_category || '—' },

@@ -43,3 +43,15 @@ export function StatusChip({ status, size = 'small' }: StatusChipProps) {
     />
   );
 }
+
+export function SimulatedBadge() {
+  return (
+    <Chip
+      label="Simulated"
+      size="small"
+      variant="outlined"
+      color="warning"
+      sx={{ ml: 0.75, fontSize: '0.65rem', height: 20, fontWeight: 500 }}
+    />
+  );
+}

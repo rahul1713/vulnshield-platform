@@ -293,7 +293,7 @@ export const webScannerApi = {
     }
     return request('/web-scans', {
       method: 'POST',
-      body: JSON.stringify({ name: `Web scan ${targetUrl}`, target_url: targetUrl, crawl_depth: 3, active_tests: true }),
+      body: JSON.stringify({ name: `Web scan ${targetUrl}`, target_url: targetUrl, crawl_depth: 3 }),
     });
   },
 };

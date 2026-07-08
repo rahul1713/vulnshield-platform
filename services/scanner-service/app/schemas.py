@@ -48,7 +48,16 @@ class AgentRegister(BaseModel):
 class AgentHeartbeat(BaseModel):
     agent_id: str
     status: str = "online"
+    timestamp: str | None = None
+    ip_address: str | None = None
     metadata: dict = {}
+
+
+class AgentInventory(BaseModel):
+    agent_id: str | None = None
+    platform: str | None = None
+    collected_at: str | None = None
+    inventory: dict = {}
 
 
 class AgentIngestPayload(BaseModel):

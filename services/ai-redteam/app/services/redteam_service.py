@@ -1,60 +1,68 @@
 import json
+import os
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from vulnshield_common.ai_orchestrator import plan_scan, sanitize_for_llm, triage_findings
+from vulnshield_common.config import get_settings
 from vulnshield_common.entity_reports import generate_redteam_executive_report
-from vulnshield_common.llm import SecurityLLMConfigurationError, get_local_security_llm_provider
+from vulnshield_common.llm import SecurityLLMConfigurationError, get_security_llm
 from vulnshield_common.messaging import publish_event
+from vulnshield_common.scan_engines import (
+    EngineUnavailableError,
+    dns_lookup,
+    engines_status,
+    httpx_probe,
+    run_nmap,
+    run_nuclei,
+)
 
-STATIC_REDTEAM_FINDINGS = [
-    {
-        "title": "Credential exposure via weak service account",
-        "severity": "critical",
-        "description": "Service account with excessive privileges identified in scope.",
-        "attack_phase": "Credential Access",
-        "mitre_technique_id": "T1078",
-        "mitre_tactic": "Credential Access",
-        "kill_chain_phase": "Exploitation",
-        "proof": "Simulated extraction of service principal credentials from misconfigured vault.",
-        "remediation": "Enforce least privilege, rotate credentials, enable MFA for service accounts, audit RBAC quarterly.",
-    },
-    {
-        "title": "Lateral movement via unsegmented network",
-        "severity": "high",
-        "description": "Flat network topology allows pivot from DMZ to internal subnets.",
-        "attack_phase": "Lateral Movement",
-        "mitre_technique_id": "T1021",
-        "mitre_tactic": "Lateral Movement",
-        "kill_chain_phase": "Actions on Objectives",
-        "proof": "Simulated RDP/SSH hop from compromised web tier to database segment.",
-        "remediation": "Implement micro-segmentation, zero-trust network access, and monitor east-west traffic.",
-    },
-    {
-        "title": "Missing EDR coverage on endpoints",
-        "severity": "high",
-        "description": "Several endpoints lack endpoint detection and response agents.",
-        "attack_phase": "Defense Evasion",
-        "mitre_technique_id": "T1562",
-        "mitre_tactic": "Defense Evasion",
-        "kill_chain_phase": "Installation",
-        "proof": "Simulated payload execution without alerting on 3 of 10 sampled hosts.",
-        "remediation": "Deploy EDR universally, enable tamper protection, integrate with SIEM.",
-    },
-    {
-        "title": "Phishing-susceptible users",
-        "severity": "medium",
-        "description": "Users clicked simulated phishing links during campaign.",
-        "attack_phase": "Initial Access",
-        "mitre_technique_id": "T1566",
-        "mitre_tactic": "Initial Access",
-        "kill_chain_phase": "Delivery",
-        "proof": "12% click rate on controlled phishing exercise.",
-        "remediation": "Security awareness training, phishing simulations, DMARC/SPF/DKIM hardening.",
-    },
-]
+
+def _allow_simulated() -> bool:
+    settings = get_settings()
+    return settings.allow_simulated_scans or os.getenv("ALLOW_SIMULATED_SCANS", "").lower() in ("1", "true", "yes")
+
+
+def _allowed_targets(scope: dict) -> list[str]:
+    targets = scope.get("targets") or scope.get("hosts") or []
+    if isinstance(targets, str):
+        targets = [targets]
+    allowed = scope.get("allowed_targets") or targets
+    return [str(t).strip() for t in allowed if t]
+
+
+async def _execute_safe_checks(targets: list[str]) -> list[dict]:
+    """Run sandbox-safe recon checks and return raw observations."""
+    observations: list[dict] = []
+    for target in targets[:10]:
+        host = target
+        if target.startswith("http"):
+            parsed = urlparse(target)
+            host = parsed.hostname or target
+            try:
+                observations.append({"check": "httpx_probe", "target": target, "result": await httpx_probe(target)})
+            except Exception as exc:
+                observations.append({"check": "httpx_probe", "target": target, "error": str(exc)})
+        try:
+            observations.append({"check": "dns_lookup", "target": host, "result": dns_lookup(host)})
+        except Exception as exc:
+            observations.append({"check": "dns_lookup", "target": host, "error": str(exc)})
+        if engines_status().get("nuclei") and target.startswith("http"):
+            try:
+                hits = await run_nuclei(target, tags=["safe", "passive", "tech"])
+                observations.append({"check": "nuclei_safe", "target": target, "findings_count": len(hits), "sample": hits[:5]})
+            except EngineUnavailableError as exc:
+                observations.append({"check": "nuclei_safe", "target": target, "error": str(exc)})
+        if engines_status().get("nmap") and host:
+            try:
+                observations.append({"check": "nmap_top_ports", "target": host, "result": await run_nmap(host, top_ports=100)})
+            except EngineUnavailableError as exc:
+                observations.append({"check": "nmap_top_ports", "target": host, "error": str(exc)})
+    return observations
 
 
 async def create_campaign(db: AsyncSession, data: dict, user_id: UUID | None = None):
@@ -76,47 +84,79 @@ async def create_campaign(db: AsyncSession, data: dict, user_id: UUID | None = N
 
 
 async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user_id: UUID | None = None):
-    chains: list = []
-    mappings: list = []
-    findings: list = []
-    used_static_fallback = False
+    scope = data.get("scope", {})
+    targets = _allowed_targets(scope)
+    if not targets:
+        raise HTTPException(400, "Campaign scope must include targets or allowed_targets")
 
     try:
-        llm = get_local_security_llm_provider()
-        system = (
-            "You are a red team operator. Plan an attack campaign mapped to MITRE ATT&CK. "
-            "Return JSON with keys: attack_chains, mitre_mappings, findings (with title, severity, "
-            "attack_phase, mitre_technique_id, mitre_tactic, proof, remediation, kill_chain_phase), "
-            "executive_summary."
+        plan = await plan_scan("red_team", targets[0], {"name": data["name"], "scope": scope})
+    except SecurityLLMConfigurationError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+    chains = plan.get("phases") or plan.get("attack_chains") or []
+    mappings = plan.get("mitre_mappings") or []
+    summary = plan.get("executive_summary")
+
+    observations = await _execute_safe_checks(targets)
+    real_checks = sum(1 for o in observations if o.get("result") or o.get("findings_count"))
+    used_simulated = False
+
+    if real_checks == 0 and not _allow_simulated():
+        raise HTTPException(
+            503,
+            f"No safe checks could be executed. Engine status: {engines_status()}. "
+            "Install nmap/nuclei or set ALLOW_SIMULATED_SCANS=true.",
         )
-        user_prompt = f"Campaign: {data['name']}\nScope: {json.dumps(data.get('scope', {}))}"
-        result = await llm.generate_json(system, user_prompt)
-        chains = result.get("attack_chains", []) or []
-        mappings = result.get("mitre_mappings", []) or []
-        findings = result.get("findings", []) or []
-        summary = result.get("executive_summary")
-    except (SecurityLLMConfigurationError, Exception):
-        findings = STATIC_REDTEAM_FINDINGS
-        used_static_fallback = True
-        chains = [{"phase": "Reconnaissance", "technique": "T1595", "description": "External footprinting"}]
-        mappings = [{"tactic": "Initial Access", "technique": "T1566"}]
-        summary = None
+
+    try:
+        llm = get_security_llm()
+        system = (
+            "You are a red team analyst. Given attack plan and REAL observation results only, "
+            "return JSON with keys: findings (title, severity, attack_phase, mitre_technique_id, "
+            "mitre_tactic, kill_chain_phase, proof, remediation), executive_summary."
+        )
+        user_prompt = sanitize_for_llm(
+            json.dumps(
+                {
+                    "campaign": data["name"],
+                    "plan": {"phases": chains, "objectives": plan.get("objectives")},
+                    "observations": observations,
+                },
+                default=str,
+            ),
+            6000,
+        )
+        analysis = await llm.generate_json(system, user_prompt)
+        findings = analysis.get("findings", []) or []
+        summary = analysis.get("executive_summary") or summary
+    except SecurityLLMConfigurationError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
     if isinstance(findings, dict):
         findings = [findings]
+    findings = await triage_findings([f for f in findings if isinstance(f, dict)])
 
+    scope_with_obs = {**scope, "observations": observations, "ai_plan": plan}
     await db.execute(
         text("""
             UPDATE red_team_campaigns SET attack_chains = CAST(:chains AS jsonb),
-                mitre_mappings = CAST(:maps AS jsonb) WHERE id = :id
+                mitre_mappings = CAST(:maps AS jsonb), scope = CAST(:scope AS jsonb) WHERE id = :id
         """),
-        {"id": str(campaign_id), "chains": json.dumps(chains), "maps": json.dumps(mappings)},
+        {
+            "id": str(campaign_id),
+            "chains": json.dumps(chains),
+            "maps": json.dumps(mappings),
+            "scope": json.dumps(scope_with_obs, default=str),
+        },
     )
 
+    is_simulated = used_simulated or (real_checks == 0 and _allow_simulated())
     count = 0
-    for i, f in enumerate(findings if isinstance(findings, list) else []):
-        if not isinstance(f, dict):
-            continue
+    for i, f in enumerate(findings):
+        proof = f.get("proof")
+        if not proof and observations:
+            proof = sanitize_for_llm(json.dumps(observations[:3], default=str), 1500)
         await db.execute(
             text("""
                 INSERT INTO red_team_findings (campaign_id, title, description, severity, attack_phase,
@@ -132,18 +172,18 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
                 "tech": f.get("mitre_technique_id"),
                 "tactic": f.get("mitre_tactic"),
                 "kc": f.get("kill_chain_phase"),
-                "proof": f.get("proof"),
+                "proof": proof,
                 "rem": f.get("remediation"),
                 "step": i + 1,
-                "sim": used_static_fallback,
+                "sim": is_simulated,
             },
         )
         count += 1
 
     if not summary:
         summary = (
-            f"Campaign '{data['name']}' identified {count} exploitable weaknesses across "
-            f"{len(chains)} attack chain phases. Prioritize credential hardening and network segmentation."
+            f"Campaign '{data['name']}' completed {real_checks} safe checks across "
+            f"{len(targets)} target(s) with {count} triaged findings."
         )
 
     await db.execute(
@@ -151,7 +191,7 @@ async def plan_and_execute(db: AsyncSession, campaign_id: UUID, data: dict, user
             UPDATE red_team_campaigns SET status = 'completed', findings_count = :fc,
                 completed_at = NOW(), executive_summary = :summary, findings_simulated = :sim WHERE id = :id
         """),
-        {"id": str(campaign_id), "fc": count, "summary": summary, "sim": used_static_fallback},
+        {"id": str(campaign_id), "fc": count, "summary": summary, "sim": is_simulated},
     )
     await publish_event("redteam.completed", {"campaign_id": str(campaign_id), "findings": count})
 

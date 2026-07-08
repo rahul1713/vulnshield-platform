@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3.6"
     ai_security_local_only: bool = True
     ai_security_allowed_models: str = "qwen3.6"
+
+    scan_sandbox_mode: bool = True
+    allow_simulated_scans: bool = False
+    allow_external_targets: bool = False
+    sandbox_allow_private: bool = True
+
+    scan_sandbox_mode: bool = False
+    allow_simulated_scans: bool = False
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
     anthropic_api_key: str = ""
@@ -49,6 +57,11 @@ class Settings(BaseSettings):
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
     azure_openai_deployment: str = ""
+
+    scan_sandbox_mode: bool = True
+    allow_external_targets: bool = False
+    zap_base_url: str = ""
+    scan_engine_timeout: int = 300
 
     @property
     def database_url(self) -> str:

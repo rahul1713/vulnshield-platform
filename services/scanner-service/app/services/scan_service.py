@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from vulnshield_common.messaging import publish_event
+from vulnshield_common.scan_sandbox import validate_scan_config_or_raise, validate_target_or_raise
 
 
 async def list_scans(db: AsyncSession, limit=50, offset=0, scan_type: str | None = None, status: str | None = None):
@@ -39,6 +40,20 @@ async def get_scan(db: AsyncSession, scan_id: UUID):
 
 
 async def create_scan(db: AsyncSession, data: dict, user_id: UUID | None = None):
+    target_config = data.get("target_config", {})
+    validate_scan_config_or_raise(target_config)
+
+    if data.get("target_asset_id"):
+        asset_r = await db.execute(
+            text("SELECT hostname, ip_address::text AS ip FROM assets WHERE id = :id"),
+            {"id": str(data["target_asset_id"])},
+        )
+        asset = asset_r.fetchone()
+        if asset:
+            for field in (asset.hostname, asset.ip):
+                if field:
+                    validate_target_or_raise(str(field), field="target_asset")
+
     r = await db.execute(
         text("""
             INSERT INTO scans (name, scan_type, target_asset_id, target_config, schedule_cron, created_by)
@@ -56,6 +71,7 @@ async def create_scan(db: AsyncSession, data: dict, user_id: UUID | None = None)
     )
     scan_id = r.fetchone().id
     await publish_event("scan.created", {"scan_id": str(scan_id), "scan_type": data["scan_type"]})
+    await publish_event("scan.started", {"scan_id": str(scan_id), "scan_type": data["scan_type"]})
     return await get_scan(db, scan_id)
 
 

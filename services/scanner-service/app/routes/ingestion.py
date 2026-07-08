@@ -3,11 +3,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from vulnshield_common.auth import TokenPayload, require_permission
 from vulnshield_common.database import get_db
 from vulnshield_common.messaging import publish_event
 from app.schemas import AgentIngestPayload
 from app.services import agent_service, scan_service
+from app.services.agent_token_service import AgentTokenPayload, require_agent_scope
 
 router = APIRouter(prefix="/ingestion", tags=["Agent Ingestion"])
 
@@ -17,8 +17,10 @@ async def ingest_agent_data(
     body: AgentIngestPayload,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: TokenPayload = Depends(require_permission("scans:write")),
+    token: AgentTokenPayload = Depends(require_agent_scope("agent:ingest")),
 ):
+    if body.agent_id != token.agent_id:
+        raise HTTPException(403, "Agent token does not match agent_id")
     agent = await agent_service.get_agent(db, body.agent_id)
     if not agent_service.verify_mtls(request, agent.get("certificate_fingerprint") or body.certificate_fingerprint):
         raise HTTPException(401, "mTLS certificate verification failed")

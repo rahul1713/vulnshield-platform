@@ -3,10 +3,12 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from vulnshield_common.messaging import publish_event
+from vulnshield_common.scan_sandbox import validate_scan_config_or_raise
 from app.services import scan_service
 
 
 async def queue_agentless_scan(db: AsyncSession, data: dict, user_id: UUID | None = None):
+    validate_scan_config_or_raise(data.get("target_config", {}))
     scan = await scan_service.create_scan(
         db,
         {

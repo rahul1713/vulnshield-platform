@@ -64,6 +64,13 @@ OLLAMA_MODEL=qwen3.6
 AI_SECURITY_LOCAL_ONLY=true
 AI_SECURITY_ALLOWED_MODELS=qwen3.6
 
+# Scan sandbox — zero external data leakage
+SCAN_SANDBOX_MODE=true
+ALLOW_SIMULATED_SCANS=false
+ALLOW_EXTERNAL_TARGETS=false
+SANDBOX_ALLOW_PRIVATE=false
+CVE_SYNC_ON_STARTUP=true
+
 # Frontend (sandbox — demo mode OFF)
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 NEXT_PUBLIC_DEPLOY_ENV=sandbox

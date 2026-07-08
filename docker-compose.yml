@@ -125,6 +125,74 @@ services:
     profiles:
       - ai
 
+  ollama-init:
+    image: curlimages/curl:8.5.0
+    container_name: vulnshield-ollama-init
+    depends_on:
+      ollama:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Ollama..."
+        until curl -sf http://ollama:11434/api/tags >/dev/null; do sleep 3; done
+        echo "Pulling qwen3.6 model..."
+        curl -sf http://ollama:11434/api/pull -d '{"name":"qwen3.6"}'
+        echo "Ollama model pull complete."
+    networks:
+      - vulnshield-net
+    profiles:
+      - ai
+    restart: "no"
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: vulnshield-zap
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port 8080
+      -config api.disablekey=true
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+    networks:
+      - vulnshield-net
+    profiles:
+      - scanning
+
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: vulnshield-ollama-init
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.6}
+    volumes:
+      - ./scripts/ollama-init.sh:/ollama-init.sh:ro
+    entrypoint: ["/bin/sh", "/ollama-init.sh"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+    profiles:
+      - ai
+    restart: "no"
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: vulnshield-zap
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/JSON/core/view/version/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - vulnshield-net
+    profiles:
+      - scan
+
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -220,6 +288,27 @@ services:
         condition: service_healthy
     networks:
       - vulnshield-net
+
+  scan-worker:
+    build:
+      context: .
+      dockerfile: services/scan-worker/Dockerfile
+    container_name: vulnshield-scan-worker
+    environment:
+      <<: *common-env
+      SCAN_SANDBOX_MODE: ${SCAN_SANDBOX_MODE:-true}
+      ALLOW_EXTERNAL_TARGETS: ${ALLOW_EXTERNAL_TARGETS:-false}
+      ZAP_BASE_URL: ${ZAP_BASE_URL:-http://zap:8080}
+      SCAN_ENGINE_TIMEOUT: ${SCAN_ENGINE_TIMEOUT:-300}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vulnshield-net
+    profiles:
+      - scan
 
   ai-code-review:
     build:

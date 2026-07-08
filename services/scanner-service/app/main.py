@@ -1,4 +1,5 @@
 """VulnShield Scanner Service."""
+import os
 from contextlib import asynccontextmanager
 
 import structlog
@@ -16,6 +17,14 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("service_starting", service="scanner-service", environment=settings.environment)
+    if os.getenv("CVE_SYNC_ON_STARTUP", "").lower() in ("1", "true", "yes"):
+        try:
+            from app.jobs.cve_sync import run_sync
+
+            result = await run_sync()
+            logger.info("cve_sync_startup_complete", **result)
+        except Exception as exc:
+            logger.warning("cve_sync_startup_failed", error=str(exc))
     yield
     logger.info("service_stopping", service="scanner-service")
 

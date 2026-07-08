@@ -60,9 +60,11 @@ class VulnShieldAgent:
 
     def _get_client(self) -> httpx.Client:
         if self._client is None:
-            headers = {}
-            if self.settings.api_token:
-                headers["Authorization"] = f"Bearer {self.settings.api_token}"
+            headers: dict[str, str] = {}
+            token = self.settings.agent_token or self.settings.api_token
+            if token:
+                headers["X-Agent-Token"] = token
+                headers["Authorization"] = f"Bearer {token}"
 
             self._client = httpx.Client(
                 base_url=self.settings.api_url.rstrip("/"),
@@ -92,7 +94,7 @@ class VulnShieldAgent:
             },
         }
         logger.info("Registering agent %s", self.agent_id)
-        response = self._post("/agents/register", payload)
+        response = self._post("/agents/machine/register", payload)
         return response.json()
 
     def heartbeat(self) -> dict:
@@ -103,7 +105,7 @@ class VulnShieldAgent:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "ip_address": self._get_primary_ip(),
         }
-        response = self._post(f"/agents/{self.agent_id}/heartbeat", payload)
+        response = self._post("/agents/machine/heartbeat", payload)
         return response.json()
 
     def send_inventory(self) -> dict:
@@ -112,12 +114,14 @@ class VulnShieldAgent:
         inventory = collect_all()
         payload = {
             "agent_id": self.agent_id,
-            "platform": self.settings.platform,
-            "collected_at": datetime.now(timezone.utc).isoformat(),
-            "inventory": inventory,
+            "scan_data": {
+                "platform": self.settings.platform,
+                "collected_at": datetime.now(timezone.utc).isoformat(),
+                "inventory": inventory,
+            },
         }
         logger.info("Uploading inventory (%d categories)", len(inventory))
-        response = self._post(f"/agents/{self.agent_id}/inventory", payload)
+        response = self._post("/ingestion/agent", payload)
         return response.json()
 
     def _get_primary_ip(self) -> str | None:

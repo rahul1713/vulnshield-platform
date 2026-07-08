@@ -107,6 +107,11 @@ def get_local_security_llm_provider() -> LLMProvider:
     return OllamaProvider()
 
 
+def get_security_llm() -> LLMProvider:
+    """Alias for security workloads — local Ollama Qwen only."""
+    return get_local_security_llm_provider()
+
+
 def get_llm_provider() -> LLMProvider:
     """General-purpose LLM provider (non-security workloads only)."""
     if settings.ai_security_local_only:

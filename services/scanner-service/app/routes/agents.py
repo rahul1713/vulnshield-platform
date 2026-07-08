@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from vulnshield_common.auth import TokenPayload, require_permission
 from vulnshield_common.database import get_db
-from app.schemas import AgentHeartbeat, AgentRegister
+from app.schemas import AgentHeartbeat, AgentInventory, AgentRegister
 from app.services import agent_service
 
 router = APIRouter(prefix="/agents", tags=["Agents"])
@@ -42,9 +42,31 @@ async def register(
 
 
 @router.post("/heartbeat")
-async def agent_heartbeat(
+async def agent_heartbeat_legacy(
     body: AgentHeartbeat,
     db: AsyncSession = Depends(get_db),
     _: TokenPayload = Depends(require_permission("scans:write")),
 ):
     return await agent_service.heartbeat(db, body.model_dump())
+
+
+@router.post("/{agent_id}/heartbeat")
+async def agent_heartbeat(
+    agent_id: str,
+    body: AgentHeartbeat,
+    db: AsyncSession = Depends(get_db),
+    _: TokenPayload = Depends(require_permission("scans:write")),
+):
+    payload = body.model_dump()
+    payload["agent_id"] = agent_id
+    return await agent_service.heartbeat(db, payload)
+
+
+@router.post("/{agent_id}/inventory")
+async def agent_inventory(
+    agent_id: str,
+    body: AgentInventory,
+    db: AsyncSession = Depends(get_db),
+    _: TokenPayload = Depends(require_permission("scans:write")),
+):
+    return await agent_service.ingest_inventory(db, agent_id, body.model_dump())

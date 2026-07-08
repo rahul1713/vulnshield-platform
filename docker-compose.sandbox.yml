@@ -1,7 +1,7 @@
 # Sandbox deployment overrides — no data leakage, no exposed infrastructure ports.
 # Usage:
 #   ./scripts/generate-sandbox-env.sh .env.sandbox
-#   docker compose --env-file .env.sandbox -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+#   make sandbox-up
 
 x-sandbox-env: &sandbox-env
   ENVIRONMENT: sandbox
@@ -10,12 +10,15 @@ x-sandbox-env: &sandbox-env
   INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-admin}
   INIT_ADMIN_EMAIL: ${INIT_ADMIN_EMAIL:-admin@vulnshield.local}
   INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:?INIT_ADMIN_PASSWORD is required for sandbox}
+  SCAN_SANDBOX_MODE: "true"
+  ALLOW_SIMULATED_SCANS: "false"
+  ALLOW_EXTERNAL_TARGETS: "false"
+  SANDBOX_ALLOW_PRIVATE: ${SANDBOX_ALLOW_PRIVATE:-false}
+  AI_SECURITY_LOCAL_ONLY: "true"
 
 services:
   postgres:
     ports: !reset []
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
 
   redis:
     ports: !reset []
@@ -33,6 +36,26 @@ services:
 
   ollama:
     ports: !reset []
+    networks:
+      - vulnshield-net
+
+  zap:
+    ports: !reset []
+    profiles:
+      - scan
+
+  scan-worker:
+    environment:
+      <<: *sandbox-env
+      SCAN_SANDBOX_MODE: "true"
+      ALLOW_EXTERNAL_TARGETS: "false"
+      ZAP_BASE_URL: http://zap:8080
+    profiles:
+      - scan
+
+  ollama-init:
+    profiles:
+      - ai
 
   api-gateway:
     environment:

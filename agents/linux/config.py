@@ -16,6 +16,7 @@ class AgentSettings(BaseSettings):
     agent_id: str = ""
     api_url: str = "https://localhost:8080/api/v1"
     api_token: str = ""
+    agent_token: str = ""
     heartbeat_interval: int = 300
     inventory_interval: int = 3600
     verify_ssl: bool = True
@@ -30,4 +31,12 @@ class AgentSettings(BaseSettings):
 
 @lru_cache
 def get_settings() -> AgentSettings:
-    return AgentSettings()
+    settings = AgentSettings()
+    # AGENT_TOKEN (no prefix) for machine-scoped auth in sandbox/production.
+    import os
+
+    if not settings.agent_token:
+        settings.agent_token = os.getenv("AGENT_TOKEN", "")
+    if settings.agent_token and not settings.api_token:
+        settings.api_token = settings.agent_token
+    return settings

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnshield_common.messaging import publish_event
 from vulnshield_common.scan_engines import httpx_probe, nuclei_to_web_finding, run_nuclei
-from vulnshield_common.scan_sandbox import is_allowed_scan_target, sanitize_log_text, truncate_for_storage
+from vulnshield_common.scan_sandbox import is_allowed_scan_target, normalize_cwe_id, sanitize_log_text, truncate_for_storage
 
 logger = structlog.get_logger()
 
@@ -106,7 +106,7 @@ async def handle_webscan_started(db: AsyncSession, payload: dict) -> None:
                 "desc": truncate_for_storage(f.get("description")),
                 "proof": truncate_for_storage(f.get("proof")),
                 "rem": truncate_for_storage(f.get("remediation")),
-                "cwe": f.get("cwe_id"),
+                "cwe": normalize_cwe_id(f.get("cwe_id")),
             },
         )
         inserted += 1

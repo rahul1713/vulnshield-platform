@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from vulnshield_common.auth import TokenPayload, require_permission
@@ -42,14 +42,12 @@ async def list_scans(
 @router.post("", response_model=WebScanResponse, status_code=201)
 async def create_scan(
     body: WebScanCreate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user: TokenPayload = Depends(require_permission("scans:write")),
 ):
     from uuid import UUID as U
 
     scan = await web_scan_service.create_web_scan(db, body.model_dump(), U(user.user_id))
-    background_tasks.add_task(_run_scan_background, scan["id"])
     return scan
 
 

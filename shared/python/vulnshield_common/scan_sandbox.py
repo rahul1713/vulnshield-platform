@@ -168,3 +168,11 @@ def truncate_for_storage(text: str | None, max_len: int = 4096) -> str | None:
     if len(text) <= max_len:
         return text
     return text[:max_len] + "\n…[truncated]"
+
+
+def normalize_cwe_id(value: str | list | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return str(value[0])[:20] if value else None
+    return str(value)[:20]

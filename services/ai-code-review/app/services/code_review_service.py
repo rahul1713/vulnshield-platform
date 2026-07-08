@@ -75,10 +75,11 @@ def _resolve_source(data: dict) -> tuple[str, str]:
 
 
 def _clone_repository(repo_url: str, branch: str = "main") -> Path:
-    if not shutil.which("git"):
+    git_bin = shutil.which("git") or ("/usr/bin/git" if Path("/usr/bin/git").is_file() else None)
+    if not git_bin:
         raise HTTPException(503, "git is required for repository scans but is not installed")
     tmp = Path(tempfile.mkdtemp(prefix="vulnshield-clone-"))
-    cmd = ["git", "clone", "--depth", "1", "--branch", branch, repo_url, str(tmp)]
+    cmd = [git_bin, "clone", "--depth", "1", "--branch", branch, repo_url, str(tmp)]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
     if result.returncode != 0:
         shutil.rmtree(tmp, ignore_errors=True)

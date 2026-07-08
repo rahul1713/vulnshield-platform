@@ -14,6 +14,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 import structlog
 
+from vulnshield_common.scan_sandbox import normalize_cwe_id
+
 logger = structlog.get_logger()
 
 LINK_RE = re.compile(r"""href=["']([^"'#]+)["']""", re.I)
@@ -275,7 +277,7 @@ def nuclei_to_web_finding(item: dict[str, Any], base_url: str) -> dict[str, Any]
         "description": info.get("description") or info.get("name", ""),
         "proof": json.dumps(item.get("matcher-name") or item.get("curl-command") or "")[:2000],
         "remediation": info.get("remediation") or "Review nuclei template guidance and remediate misconfiguration.",
-        "cwe_id": (info.get("classification") or {}).get("cwe-id"),
+        "cwe_id": normalize_cwe_id((info.get("classification") or {}).get("cwe-id")),
         "is_simulated": False,
     }
 

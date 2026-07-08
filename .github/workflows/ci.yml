@@ -155,8 +155,8 @@ jobs:
           file: ${{ matrix.service == 'linux-agent' && 'agents/linux/Dockerfile' || matrix.service == 'frontend' && 'frontend/Dockerfile' || format('services/{0}/Dockerfile', matrix.service) }}
           push: false
           tags: vulnshield/${{ matrix.service }}:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
   validate-k8s:
     name: Validate Kubernetes Manifests

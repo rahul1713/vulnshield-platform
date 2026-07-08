@@ -11,24 +11,6 @@ from app.services import web_scan_service
 router = APIRouter(prefix="/web-scans", tags=["Web Scans"])
 
 
-async def _run_scan_background(scan_id: UUID):
-    from sqlalchemy import text
-    from vulnshield_common.database import AsyncSessionLocal
-
-    async with AsyncSessionLocal() as db:
-        try:
-            await web_scan_service.execute_web_scan(db, scan_id)
-            await db.commit()
-        except Exception as exc:
-            await db.rollback()
-            async with AsyncSessionLocal() as err_db:
-                await err_db.execute(
-                    text("UPDATE scans SET status = 'failed', error_message = :err WHERE id = :id"),
-                    {"id": str(scan_id), "err": str(exc)[:500]},
-                )
-                await err_db.commit()
-
-
 @router.get("", response_model=list[WebScanResponse])
 async def list_scans(
     limit: int = Query(50, ge=1, le=200),
@@ -57,8 +39,8 @@ async def execute_scan(
     db: AsyncSession = Depends(get_db),
     _: TokenPayload = Depends(require_permission("scans:write")),
 ):
-    """Trigger scan execution (used by scan-worker or manual retry)."""
-    return await web_scan_service.execute_web_scan(db, scan_id)
+    """Re-queue scan for async execution by scan-worker."""
+    return await web_scan_service.queue_web_scan(db, scan_id)
 
 
 @router.get("/{scan_id}", response_model=WebScanResponse)

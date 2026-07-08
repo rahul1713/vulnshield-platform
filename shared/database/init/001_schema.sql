@@ -183,7 +183,7 @@ CREATE TABLE cves (
     published_date DATE,
     last_modified DATE,
     cwe_ids JSONB DEFAULT '[]',
-    references JSONB DEFAULT '[]',
+    "references" JSONB DEFAULT '[]',
     cpes JSONB DEFAULT '[]',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -436,7 +436,7 @@ CREATE TABLE code_review_findings (
     code_snippet TEXT,
     recommended_fix TEXT,
     secure_code_example TEXT,
-    references JSONB DEFAULT '[]',
+    "references" JSONB DEFAULT '[]',
     confidence_score DECIMAL(3,2),
     owasp_category VARCHAR(100),
     cwe_id VARCHAR(20),

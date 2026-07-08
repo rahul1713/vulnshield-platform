@@ -7,6 +7,7 @@ x-sandbox-env: &sandbox-env
   ENVIRONMENT: sandbox
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required for sandbox}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for sandbox}
   INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-admin}
   INIT_ADMIN_EMAIL: ${INIT_ADMIN_EMAIL:-admin@vulnshield.local}
   INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:?INIT_ADMIN_PASSWORD is required for sandbox}
@@ -62,7 +63,7 @@ services:
       <<: *sandbox-env
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:8080"
 
   auth-service:
     environment:

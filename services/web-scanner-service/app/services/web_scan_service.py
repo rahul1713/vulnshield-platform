@@ -9,6 +9,7 @@ from vulnshield_common.messaging import publish_event
 from vulnshield_common.scan_sandbox import (
     allow_simulated_scans,
     is_scan_sandbox_mode,
+    normalize_cwe_id,
     validate_scan_config_or_raise,
     validate_target_or_raise,
 )
@@ -79,8 +80,12 @@ async def create_web_scan(db: AsyncSession, data: dict, user_id: UUID | None = N
     return await get_web_scan(db, scan_id)
 
 
-async def execute_web_scan(db: AsyncSession, scan_id: UUID):
-    """Run crawl + OWASP tests inline (scan-worker can call this endpoint when ready)."""
+async def queue_web_scan(db: AsyncSession, scan_id: UUID) -> dict:
+    """Re-queue a web scan for async execution by scan-worker (no inline nuclei)."""
+    scan = await get_web_scan(db, scan_id)
+    if scan["status"] in ("completed", "cancelled"):
+        raise HTTPException(400, f"Scan already {scan['status']}")
+
     cfg_r = await db.execute(text("SELECT target_config FROM scans WHERE id = :id"), {"id": str(scan_id)})
     row = cfg_r.fetchone()
     if not row:
@@ -89,11 +94,27 @@ async def execute_web_scan(db: AsyncSession, scan_id: UUID):
     base_url = cfg.get("target_url")
     if not base_url:
         raise HTTPException(400, "Scan missing target_url in target_config")
-    depth = int(cfg.get("crawl_depth", 3))
-    tests = cfg.get("active_tests") or list(OWASP_TESTS.keys())
 
-    await crawl_target(db, scan_id, base_url, depth)
-    return await run_owasp_tests(db, scan_id, tests)
+    await db.execute(
+        text("""
+            UPDATE scans
+            SET status = 'running', started_at = COALESCE(started_at, NOW()),
+                error_message = NULL, completed_at = NULL
+            WHERE id = :id
+        """),
+        {"id": str(scan_id)},
+    )
+    await publish_event("webscan.started", {"scan_id": str(scan_id), "url": base_url})
+    return {
+        "scan_id": str(scan_id),
+        "status": "queued",
+        "message": "Scan queued for async execution by scan-worker",
+    }
+
+
+async def execute_web_scan(db: AsyncSession, scan_id: UUID):
+    """Delegate to scan-worker; inline nuclei is not available in this service."""
+    return await queue_web_scan(db, scan_id)
 
 
 async def get_web_scan(db: AsyncSession, scan_id: UUID):
@@ -230,7 +251,7 @@ async def run_owasp_tests(db: AsyncSession, scan_id: UUID, tests: list[str]):
                         "desc": nf["description"],
                         "proof": nf.get("proof"),
                         "rem": nf["remediation"],
-                        "cwe": nf.get("cwe_id"),
+                        "cwe": normalize_cwe_id(nf.get("cwe_id")),
                     },
                 )
                 findings += 1

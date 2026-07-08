@@ -96,7 +96,7 @@ async def upsert_cves(db: AsyncSession, rows: list[dict]) -> int:
         await db.execute(
             text("""
                 INSERT INTO cves (cve_id, description, cvss_v3_score, cvss_v3_vector,
-                    cwe_ids, references, cpes, published_date, last_modified)
+                    cwe_ids, "references", cpes, published_date, last_modified)
                 VALUES (:cve_id, :description, :cvss_v3_score, :cvss_v3_vector,
                     CAST(:cwe_ids AS jsonb), CAST(:references AS jsonb), CAST(:cpes AS jsonb),
                     CAST(:published_date AS date), CAST(:last_modified AS date))
@@ -105,7 +105,7 @@ async def upsert_cves(db: AsyncSession, rows: list[dict]) -> int:
                     cvss_v3_score = EXCLUDED.cvss_v3_score,
                     cvss_v3_vector = EXCLUDED.cvss_v3_vector,
                     cwe_ids = EXCLUDED.cwe_ids,
-                    references = EXCLUDED.references,
+                    "references" = EXCLUDED."references",
                     last_modified = EXCLUDED.last_modified,
                     updated_at = NOW()
             """),

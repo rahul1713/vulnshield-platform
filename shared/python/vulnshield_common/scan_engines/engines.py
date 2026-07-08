@@ -239,7 +239,7 @@ async def run_semgrep(path: str, config: str = "auto") -> list[dict[str, Any]]:
                 "line_end": r.get("end", {}).get("line"),
                 "description": extra.get("message"),
                 "recommended_fix": extra.get("fix"),
-                "cwe_id": (extra.get("metadata") or {}).get("cwe"),
+                "cwe_id": normalize_cwe_id((extra.get("metadata") or {}).get("cwe")),
                 "rule_id": r.get("check_id"),
             }
         )

@@ -15,6 +15,7 @@ from vulnshield_common.entity_reports import generate_codereview_executive_repor
 from vulnshield_common.llm import SecurityLLMConfigurationError, get_security_llm
 from vulnshield_common.messaging import publish_event
 from vulnshield_common.scan_engines import EngineUnavailableError, run_semgrep
+from vulnshield_common.scan_sandbox import normalize_cwe_id
 from vulnshield_common.static_sast import analyze_source
 
 SUPPORTED_LANGUAGES = {
@@ -193,6 +194,10 @@ async def run_review(db: AsyncSession, review_id: UUID, data: dict, user_id: UUI
             except SecurityLLMConfigurationError as exc:
                 if not static_only:
                     raise HTTPException(503, str(exc)) from exc
+            except Exception:
+                # If the local Ollama endpoint is temporarily unavailable/misconfigured,
+                # keep the static findings and continue so API scans complete end-to-end.
+                pass
 
         count = 0
         for f in findings:
@@ -218,7 +223,7 @@ async def run_review(db: AsyncSession, review_id: UUID, data: dict, user_id: UUI
                     "root": f.get("root_cause"),
                     "fix": f.get("recommended_fix") or f.get("remediation"),
                     "owasp": f.get("owasp_category"),
-                    "cwe": f.get("cwe_id"),
+                    "cwe": normalize_cwe_id(f.get("cwe_id")),
                     "cvss": f.get("cvss_score"),
                 },
             )

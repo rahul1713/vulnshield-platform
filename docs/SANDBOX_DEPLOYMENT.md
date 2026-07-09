@@ -36,7 +36,7 @@ Hardened deployment for **staging, POC, and isolated security labs**. No hardcod
 make sandbox-up
 
 # 3. Open UI — sandbox banner confirms restricted mode
-open http://localhost:3000
+open http://localhost:3002
 ```
 
 Log in with the admin credentials printed by step 1. You will be prompted to change the password (`must_change_password=true`).
@@ -53,16 +53,28 @@ Set `NVD_API_KEY` in `.env.sandbox` for higher rate limits (optional).
 
 ```bash
 # After login, issue a scoped machine token (admin JWT required):
-curl -X POST http://localhost:8080/api/v1/agents/tokens \
+curl -X POST http://localhost:18080/api/v1/agents/tokens \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{"agent_id":"my-host-01","label":"lab-agent"}'
 
 # Run agent with the returned token (shown once):
 export AGENT_TOKEN=vsat_...
-export VULNSHIELD_API_URL=http://localhost:8080/api/v1
+export VULNSHIELD_API_URL=http://localhost:18080/api/v1
 python agents/linux/agent.py
 ```
+
+
+## Host ports (Docker Desktop)
+
+Sandbox binds **only two** services to your machine (loopback), so most containers show an empty **PORTS** column in Docker Desktop — that is expected.
+
+| Service | Published port | URL |
+|---------|----------------|-----|
+| `frontend` | `127.0.0.1:3002` → container `3000` | http://127.0.0.1:3002 |
+| `api-gateway` | `127.0.0.1:18080` → container `8080` | http://127.0.0.1:18080/health |
+
+Ports **3000** and **8080** are used by the default (dev) compose file. Sandbox uses **3002** and **18080** to avoid conflicts (for example Open WebUI on 3000). Always start sandbox with `make sandbox-up` (both compose files + `.env.sandbox`), not plain `docker compose up`.
 
 ## Scan restrictions
 

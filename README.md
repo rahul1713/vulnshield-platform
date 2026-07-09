@@ -23,14 +23,14 @@ make sandbox-env
 make sandbox-up
 
 # Step 3 — Open the dashboard
-open http://localhost:3000
+open http://localhost:3002
 ```
 
 | After deploy | URL |
 |--------------|-----|
-| **Dashboard** | http://localhost:3000 |
-| **API** | http://localhost:8080/api/v1 |
-| **Health check** | http://localhost:8080/health |
+| **Dashboard** | http://localhost:3002 (or http://127.0.0.1:3002) |
+| **API** | http://localhost:18080/api/v1 |
+| **Health check** | http://localhost:18080/health |
 
 Log in with the admin credentials printed by `make sandbox-env`. Full security checklist → [docs/SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md)
 

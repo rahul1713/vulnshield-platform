@@ -1,9 +1,11 @@
-.PHONY: help up down build logs migrate seed test lint clean sandbox-env sandbox-up sandbox-down cve-sync pull-qwen
+.PHONY: help up down build logs migrate seed test lint clean sandbox-env sandbox-up sandbox-down deploy cve-sync pull-qwen
 
 help:
 	@echo "VulnShield Platform - Available Commands"
+	@echo "  make deploy        - ONE COMMAND org deploy (builds locally)"
+	@echo "  make deploy-pull   - Org deploy from GHCR images (no build)"
 	@echo "  make up            - Start all services (development)"
-	@echo "  make sandbox-env   - Generate .env.sandbox with random secrets"
+	@echo "  make sandbox-env   - Generate .env.sandbox"
 	@echo "  make sandbox-up    - Start hardened sandbox (AI + scan-worker + ollama-init)"
 	@echo "  make sandbox-down  - Stop sandbox deployment"
 	@echo "  make cve-sync      - Sync recent CVEs from NVD into Postgres"
@@ -22,6 +24,18 @@ up:
 
 sandbox-env:
 	./scripts/generate-sandbox-env.sh .env.sandbox
+
+deploy:
+	chmod +x scripts/deploy.sh scripts/deploy-pull.sh scripts/ensure-admin-password.sh scripts/wait-healthy.sh
+	./scripts/deploy.sh
+
+deploy-pull:
+	chmod +x scripts/deploy-pull.sh scripts/deploy.sh scripts/ensure-admin-password.sh scripts/wait-healthy.sh
+	./scripts/deploy-pull.sh
+
+publish-images:
+	chmod +x scripts/publish-images.sh
+	./scripts/publish-images.sh $(TAG)
 
 sandbox-up:
 	docker compose --env-file .env.sandbox -f docker-compose.yml -f docker-compose.sandbox.yml --profile ai --profile scan up -d --build

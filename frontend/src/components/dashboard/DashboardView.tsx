@@ -4,6 +4,7 @@ import { Alert, Box, Button, Card, CardContent, Stack, Typography } from '@mui/m
 import {
   BugReport,
   CheckCircle,
+  Code,
   PlayArrow,
   Radar,
   Storage,
@@ -87,6 +88,9 @@ export function DashboardView({ title, subtitle, fetchKey }: DashboardViewProps)
             </Button>
             <Button component={Link} href="/web-scanner" variant="outlined" startIcon={<Radar />}>
               Start Web Scan
+            </Button>
+            <Button component={Link} href="/code-review" variant="outlined" startIcon={<Code />}>
+              AI Code Review
             </Button>
             <Button component={Link} href="/vulnerabilities" variant="outlined" startIcon={<BugReport />}>
               View Vulnerabilities

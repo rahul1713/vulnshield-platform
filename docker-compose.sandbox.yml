@@ -59,6 +59,7 @@ services:
       - ai
 
   api-gateway:
+    restart: unless-stopped
     environment:
       <<: *sandbox-env
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -111,13 +112,16 @@ services:
       <<: *sandbox-env
 
   frontend:
+    restart: unless-stopped
     build:
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:18080/api/v1}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:18080/api/v1}
+        NEXT_PUBLIC_API_PORT: ${NEXT_PUBLIC_API_PORT:-18080}
         NEXT_PUBLIC_DEPLOY_ENV: sandbox
         NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
     environment:
       NEXT_PUBLIC_DEPLOY_ENV: sandbox
       NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
+      NEXT_PUBLIC_API_PORT: ${NEXT_PUBLIC_API_PORT:-18080}
     ports: !override
       - "127.0.0.1:3002:3000"

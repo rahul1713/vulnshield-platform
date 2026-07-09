@@ -98,4 +98,10 @@ async def download_report(
         "json": "application/json",
         "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }
-    return Response(content=data, media_type=media.get(report["format"], "application/octet-stream"))
+    return Response(
+        content=data,
+        media_type=media.get(report["format"], "application/octet-stream"),
+        headers={
+            "Content-Disposition": f'attachment; filename="{report.get("name", "report")}.pdf"',
+        },
+    )

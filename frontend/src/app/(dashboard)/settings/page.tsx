@@ -10,15 +10,19 @@ import {
   TextField,
   Typography,
   Button,
+  Chip,
+  Stack,
 } from '@mui/material';
 import { Save } from '@mui/icons-material';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { getApiUrl, isSandboxDeploy } from '@/lib/env';
 
 export default function SettingsPage() {
   const { mode, setMode } = useThemeMode();
   const { showToast } = useToast();
+  const apiUrl = getApiUrl();
 
   const handleSave = () => {
     showToast('Preferences saved (theme persists automatically)', 'success');
@@ -46,14 +50,21 @@ export default function SettingsPage() {
 
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>API Configuration</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="h6">API Configuration</Typography>
+              {isSandboxDeploy() && <Chip label="Sandbox" size="small" color="info" />}
+            </Stack>
             <TextField
               fullWidth
               label="API URL"
-              value={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}
+              value={apiUrl}
               disabled
               margin="normal"
-              helperText="Configured via NEXT_PUBLIC_API_URL environment variable"
+              helperText={
+                isSandboxDeploy()
+                  ? 'Sandbox API gateway — derived from your browser host and port 18080'
+                  : 'Configured via NEXT_PUBLIC_API_URL environment variable'
+              }
             />
           </CardContent>
         </Card>

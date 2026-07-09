@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -6,9 +7,12 @@ import tempfile
 from pathlib import Path
 from uuid import UUID
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from vulnshield_common.database import AsyncSessionLocal
 
 from vulnshield_common.ai_orchestrator import sanitize_for_llm, triage_findings
 from vulnshield_common.entity_reports import generate_codereview_executive_report
@@ -29,6 +33,10 @@ ALLOWED_CODE_ROOTS = (
     "/workspace",
     "/code",
 )
+
+logger = structlog.get_logger()
+
+_background_tasks: set[asyncio.Task] = set()
 
 SOURCE_EXTENSIONS = {
     "python": {".py"},
@@ -122,6 +130,35 @@ async def _scan_directory(repo_path: Path, language: str) -> list[dict]:
     return deduped
 
 
+async def _mark_review_failed(review_id: UUID, error: str) -> None:
+    async with AsyncSessionLocal() as db:
+        try:
+            await db.execute(
+                text("""
+                    UPDATE code_reviews
+                    SET status = 'failed', completed_at = NOW()
+                    WHERE id = :id
+                """),
+                {"id": str(review_id)},
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+    logger.error("codereview_failed", review_id=str(review_id), error=error[:500])
+
+
+async def _run_review_background(review_id: UUID, data: dict, user_id: UUID | None) -> None:
+    async with AsyncSessionLocal() as db:
+        try:
+            await run_review(db, review_id, data, user_id)
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            await _mark_review_failed(review_id, str(exc))
+            logger.exception("codereview_background_failed", review_id=str(review_id))
+
+
 async def create_review(db: AsyncSession, data: dict, user_id: UUID | None = None):
     lang = data["language"].lower()
     if lang not in SUPPORTED_LANGUAGES:
@@ -142,8 +179,11 @@ async def create_review(db: AsyncSession, data: dict, user_id: UUID | None = Non
     )
     review_id = r.fetchone().id
     await publish_event("codereview.started", {"review_id": str(review_id), "language": lang})
-    data = {**data, "source_code": source_code, "file_path": file_path}
-    return await run_review(db, review_id, data, user_id)
+    payload = {**data, "source_code": source_code, "file_path": file_path}
+    task = asyncio.create_task(_run_review_background(review_id, payload, user_id))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return await get_review(db, review_id)
 
 
 async def run_review(db: AsyncSession, review_id: UUID, data: dict, user_id: UUID | None = None):

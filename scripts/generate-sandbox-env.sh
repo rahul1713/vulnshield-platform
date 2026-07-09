@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate a .env file with cryptographically random secrets for sandbox deployment.
+# Generate a .env file with secrets for sandbox / organization deployment.
 # Usage: ./scripts/generate-sandbox-env.sh [output-file]
 set -euo pipefail
 
@@ -13,17 +13,20 @@ RABBITMQ_PASSWORD="$(rand_hex 24)"
 MINIO_SECRET_KEY="$(rand_hex 24)"
 REDIS_PASSWORD="$(rand_hex 24)"
 JWT_SECRET="$(rand_hex 32)"
-INIT_ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+
+# Organization default — same for every fresh deploy; change before external sharing.
+INIT_ADMIN_PASSWORD="${INIT_ADMIN_PASSWORD:-Admin@123456}"
+INIT_ADMIN_USERNAME="${INIT_ADMIN_USERNAME:-admin}"
 
 cat > "${ROOT}/${OUT}" <<EOF
-# VulnShield Sandbox Environment — AUTO-GENERATED $(date -u +%Y-%m-%dT%H:%M:%SZ)
-# NEVER commit this file. Store secrets in your vault / secret manager.
+# VulnShield Organization Sandbox — AUTO-GENERATED $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# NEVER commit this file.
 
 ENVIRONMENT=sandbox
 LOG_LEVEL=INFO
 
-# Bootstrap admin (shown once below — change after first login)
-INIT_ADMIN_USERNAME=admin
+# Organization login (dashboard)
+INIT_ADMIN_USERNAME=${INIT_ADMIN_USERNAME}
 INIT_ADMIN_EMAIL=admin@vulnshield.local
 INIT_ADMIN_PASSWORD=${INIT_ADMIN_PASSWORD}
 
@@ -54,38 +57,36 @@ MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 MINIO_BUCKET=vulnshield-evidence
 MINIO_USE_SSL=false
 
-# CORS — set to your sandbox frontend URL(s)
-CORS_ORIGINS=http://localhost:3000,https://vulnshield-sandbox.example.com
+CORS_ORIGINS=http://localhost:3002,http://127.0.0.1:3002
 
-# Security AI — local Ollama only
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=qwen3.6
 AI_SECURITY_LOCAL_ONLY=true
 AI_SECURITY_ALLOWED_MODELS=qwen3.6
 
-# Scan sandbox — zero external data leakage
 SCAN_SANDBOX_MODE=true
 ALLOW_SIMULATED_SCANS=false
 ALLOW_EXTERNAL_TARGETS=false
 SANDBOX_ALLOW_PRIVATE=false
 CVE_SYNC_ON_STARTUP=true
 
-# Frontend (sandbox — demo mode OFF)
-NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+NEXT_PUBLIC_API_URL=http://127.0.0.1:18080/api/v1
+NEXT_PUBLIC_API_PORT=18080
 NEXT_PUBLIC_DEPLOY_ENV=sandbox
 NEXT_PUBLIC_ENABLE_DEMO_MODE=false
 
-API_GATEWAY_PORT=8080
+FRONTEND_PORT=3002
+API_GATEWAY_PORT=18080
 EOF
 
 chmod 600 "${ROOT}/${OUT}"
 
 echo "Wrote ${OUT}"
 echo ""
-echo "=== SAVE THESE CREDENTIALS SECURELY (shown once) ==="
-echo "Admin username: admin"
-echo "Admin password: ${INIT_ADMIN_PASSWORD}"
-echo "===================================================="
+echo "Organization login:"
+echo "  URL:      http://127.0.0.1:3002"
+echo "  Username: ${INIT_ADMIN_USERNAME}"
+echo "  Password: ${INIT_ADMIN_PASSWORD}"
 echo ""
-echo "Deploy with: docker compose --env-file ${OUT} -f docker-compose.yml -f docker-compose.sandbox.yml up -d"
+echo "Deploy with: make deploy"

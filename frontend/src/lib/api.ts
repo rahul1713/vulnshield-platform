@@ -34,8 +34,6 @@ async function demo() {
   return demoStore;
 }
 
-const API_URL = getApiUrl();
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -74,7 +72,7 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`${getApiUrl()}${endpoint}`, {
     ...options,
     headers,
   });
@@ -296,6 +294,8 @@ export const webScannerApi = {
       body: JSON.stringify({ name: `Web scan ${targetUrl}`, target_url: targetUrl, crawl_depth: 3 }),
     });
   },
+  get: (scanId: string) => request<{ id: string; target_url: string; findings_count?: number }>(`/web-scans/${scanId}`),
+  getFindings: (scanId: string) => request<WebScanFinding[]>(`/web-scans/${scanId}/findings`),
 };
 
 // ============================================================
@@ -335,6 +335,14 @@ export const codeReviewApi = {
       }),
     });
   },
+  get: async (reviewId: string) => {
+    if (isDemoSession()) {
+      const review = (await demo()).getCodeReviews().find((r) => r.id === reviewId);
+      if (!review) throw new ApiError(404, 'Code review not found');
+      return review;
+    }
+    return request<CodeReview>(`/reviews/${reviewId}`);
+  },
   getFindings: async (reviewId: string) => {
     if (isDemoSession()) return [];
     return request<unknown[]>(`/reviews/${reviewId}/findings`);
@@ -366,6 +374,8 @@ export const redTeamApi = {
       body: JSON.stringify({ name, description, scope: {} }),
     });
   },
+  get: (campaignId: string) => request<RedTeamCampaign>(`/campaigns/${campaignId}`),
+  getFindings: (campaignId: string) => request<unknown[]>(`/campaigns/${campaignId}/findings`),
 };
 
 // ============================================================
@@ -410,18 +420,14 @@ export const reportsApi = {
     return request<Report>(paths[entityType], { method: 'POST' });
   },
   download: async (reportId: string, filename: string) => {
+    const { downloadBlob, validatePdfBlob } = await import('@/lib/download-blob');
     const token = getStoredToken();
-    const response = await fetch(`${API_URL}/reports/${reportId}/download`, {
+    const response = await fetch(`${getApiUrl()}/reports/${reportId}/download`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) throw new ApiError(response.status, 'Failed to download report');
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const blob = await validatePdfBlob(await response.blob());
+    downloadBlob(blob, filename);
   },
 };
 
@@ -498,4 +504,4 @@ export const searchApi = {
   },
 };
 
-export { API_URL };
+export { getApiUrl };

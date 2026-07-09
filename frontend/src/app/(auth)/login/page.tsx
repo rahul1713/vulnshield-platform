@@ -14,12 +14,12 @@ import { Shield, LockOutlined } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/layout/AuthProvider';
-import { isDemoModeEnabled } from '@/lib/env';
+import { isDemoModeEnabled, isSandboxDeploy, ORG_DEFAULT_ADMIN_USERNAME } from '@/lib/env';
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(isSandboxDeploy() ? ORG_DEFAULT_ADMIN_USERNAME : '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -117,6 +117,14 @@ export default function LoginPage() {
                 {submitting ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
               </Button>
             </Box>
+
+            {isSandboxDeploy() && (
+              <Alert severity="info" sx={{ mt: 3 }}>
+                Organization sandbox — sign in with username <strong>admin</strong> and the password
+                from <code>.env.sandbox</code> (<code>INIT_ADMIN_PASSWORD</code>). Default fresh deploy:{' '}
+                <strong>Admin@123456</strong>.
+              </Alert>
+            )}
 
             {isDemoModeEnabled() && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3, textAlign: 'center' }}>

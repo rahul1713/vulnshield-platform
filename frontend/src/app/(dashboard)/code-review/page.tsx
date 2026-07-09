@@ -60,8 +60,14 @@ export default function CodeReviewPage() {
     onSuccess: async (review) => {
       if (isDemoSession()) {
         await waitForDemoReportInput(`codereview:${review.id}`);
+        showToast('SAST complete — executive PDF report ready', 'success');
+      } else if (review.status === 'running') {
+        showToast('SAST scan started — results appear when status is completed', 'success');
+      } else if (review.status === 'completed') {
+        showToast('SAST complete — executive PDF report ready', 'success');
+      } else {
+        showToast('Code review queued', 'info');
       }
-      showToast('SAST complete — executive PDF report ready', 'success');
       queryClient.invalidateQueries({ queryKey: ['code-review'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
     },

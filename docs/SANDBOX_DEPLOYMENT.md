@@ -144,6 +144,7 @@ npm run dev
 - Web scanner uses real engines (nuclei/httpx) when available; simulated stubs are disabled in sandbox
 - Red team requires local Ollama — static fallback findings are refused when `ALLOW_SIMULATED_SCANS=false`
 - AI features use local Ollama (`make sandbox-up` pulls `qwen3.6` via `ollama-init`) — source code sent to LLM stays in your network
+- **`vulnshield-ollama-init` is a one-shot init job** (`restart: "no"` in Compose): it pulls the model and **exits 0**. Docker Desktop showing **Exited** (not Running) is **normal**; verify **`vulnshield-ollama`** is healthy and `docker compose exec ollama ollama list` includes `qwen3.6`.
 - Audit logs record actions but never passwords or tokens
 
 ## Makefile reference

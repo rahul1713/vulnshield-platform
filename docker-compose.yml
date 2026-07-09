@@ -181,6 +181,22 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_started
+      asset-service:
+        condition: service_started
+      scanner-service:
+        condition: service_started
+      web-scanner-service:
+        condition: service_started
+      patch-intelligence:
+        condition: service_started
+      risk-engine:
+        condition: service_started
+      reporting-service:
+        condition: service_started
+      compliance-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
     networks:
       - vulnshield-net
 

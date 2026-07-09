@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { reportsApi } from '@/lib/api';
 import { downloadPdfBlob, ExecutiveReportInput, generateExecutivePdf } from '@/lib/executive-pdf';
 import { isDemoSession } from '@/lib/api-client-helpers';
+import { isSandboxDeploy } from '@/lib/env';
 import { waitForDemoReportInput } from '@/lib/demo-helpers';
+import { buildReportInputFromEntity } from '@/lib/report-pdf-client';
 import { useToast } from '@/components/ui/ToastProvider';
 
 interface ReportDownloadButtonProps {
@@ -35,6 +37,11 @@ async function resolveDemoInput(
   return ready ? demoStore.getReportInput(demoReportKey) ?? null : null;
 }
 
+async function downloadClientPdf(input: ExecutiveReportInput, filename: string) {
+  const blob = await generateExecutivePdf(input);
+  downloadPdfBlob(blob, filename);
+}
+
 export function ReportDownloadButton({
   label = 'Download PDF Report',
   filename,
@@ -59,9 +66,16 @@ export function ReportDownloadButton({
           showToast('Report not ready yet — wait for the assessment to complete', 'warning');
           return;
         }
-        const blob = await generateExecutivePdf(input);
-        downloadPdfBlob(blob, filename);
+        await downloadClientPdf(input, filename);
         showToast('Executive PDF downloaded', 'success');
+        return;
+      }
+
+      // Sandbox: generate PDF in the browser from live API data (reliable download).
+      if (isSandboxDeploy() && entityType && entityId) {
+        const input = await buildReportInputFromEntity(entityType, entityId);
+        await downloadClientPdf(input, filename);
+        showToast('PDF downloaded — open from your Downloads folder', 'success');
         return;
       }
 
@@ -73,8 +87,7 @@ export function ReportDownloadButton({
       if (!id && entityType === 'webscan' && demoReportKey) {
         const input = await resolveDemoInput(demoReportKey, demoInput);
         if (input) {
-          const blob = await generateExecutivePdf(input);
-          downloadPdfBlob(blob, filename);
+          await downloadClientPdf(input, filename);
           showToast('Executive PDF downloaded', 'success');
           return;
         }
@@ -84,7 +97,7 @@ export function ReportDownloadButton({
         return;
       }
       await reportsApi.download(id, filename);
-      showToast('Executive PDF downloaded', 'success');
+      showToast('PDF downloaded — open from your Downloads folder', 'success');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to download report', 'error');
     } finally {

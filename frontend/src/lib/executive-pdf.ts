@@ -1,6 +1,7 @@
 'use client';
 
 import type { ExecutiveReportInput } from '@/lib/executive-pdf-types';
+import { downloadBlob } from '@/lib/download-blob';
 
 const SEVERITY_COLORS: Record<string, [number, number, number]> = {
   critical: [220, 38, 38],
@@ -132,15 +133,7 @@ export async function generateExecutivePdf(input: ExecutiveReportInput): Promise
 }
 
 export function downloadPdfBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
 }
 
 export type { ExecutiveFinding, ExecutiveReportInput } from '@/lib/executive-pdf-types';

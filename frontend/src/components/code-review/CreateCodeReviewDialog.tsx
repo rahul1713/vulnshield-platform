@@ -15,6 +15,9 @@ import {
   TextField,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { isSandboxDeploy } from '@/lib/env';
+
+const SANDBOX_BENCHMARK_REPO = 'https://github.com/eslint/eslint.git';
 
 const LANGUAGES = ['Python', 'JavaScript', 'TypeScript', 'Java', 'Go', 'Ruby', 'C#', 'PHP', 'Rust', 'Kotlin'];
 
@@ -31,8 +34,8 @@ interface CreateCodeReviewDialogProps {
 
 export function CreateCodeReviewDialog({ open, onClose, onSubmit }: CreateCodeReviewDialogProps) {
   const [tab, setTab] = useState(0);
-  const [language, setLanguage] = useState('Python');
-  const [repo, setRepo] = useState('https://github.com/org/repo');
+  const [language, setLanguage] = useState(isSandboxDeploy() ? 'JavaScript' : 'Python');
+  const [repo, setRepo] = useState(isSandboxDeploy() ? SANDBOX_BENCHMARK_REPO : 'https://github.com/org/repo');
   const [branch, setBranch] = useState('main');
   const [filePath, setFilePath] = useState('/workspace/src/app.py');
   const [sourceCode, setSourceCode] = useState('');
@@ -41,8 +44,8 @@ export function CreateCodeReviewDialog({ open, onClose, onSubmit }: CreateCodeRe
   useEffect(() => {
     if (!open) {
       setTab(0);
-      setLanguage('Python');
-      setRepo('https://github.com/org/repo');
+      setLanguage(isSandboxDeploy() ? 'JavaScript' : 'Python');
+      setRepo(isSandboxDeploy() ? SANDBOX_BENCHMARK_REPO : 'https://github.com/org/repo');
       setBranch('main');
       setFilePath('/workspace/src/app.py');
       setSourceCode('');
@@ -105,7 +108,11 @@ export function CreateCodeReviewDialog({ open, onClose, onSubmit }: CreateCodeRe
               fullWidth
               margin="normal"
               placeholder="https://github.com/org/repo"
-              helperText="For full repo scans, integrate with CI. Paste code or file path for immediate SAST."
+              helperText={
+                isSandboxDeploy()
+                  ? `Sandbox: git clone + SAST runs in the background. Benchmark repo: ${SANDBOX_BENCHMARK_REPO} (100k+ LOC). Web scan targets are restricted to localhost.`
+                  : 'For full repo scans, integrate with CI. Paste code or file path for immediate SAST.'
+              }
             />
             <TextField
               label="Branch"

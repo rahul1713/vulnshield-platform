@@ -6,33 +6,48 @@
 
 ---
 
-## Deploy in 3 steps (sandbox — recommended)
+## Deploy in one command (organization sandbox)
 
-Industry-hardened deployment with **no hardcoded passwords**, **no demo data leakage**, and infrastructure ports kept internal.
-
-![Deployment flow](docs/images/deployment-flow.png)
+### For your organization (pull pre-built images — fastest)
 
 ```bash
 git clone https://github.com/rahul1713/vulnshield-platform.git
 cd vulnshield-platform
-
-# Step 1 — Generate secrets (admin password shown once — save it securely)
-make sandbox-env
-
-# Step 2 — Start the platform
-make sandbox-up
-
-# Step 3 — Open the dashboard
-open http://localhost:3002
+make deploy-pull
 ```
+
+Images: `ghcr.io/rahul1713/vulnshield-*:latest` on GitHub Container Registry.
+
+### Build from source (developers)
+
+```bash
+git clone https://github.com/rahul1713/vulnshield-platform.git
+cd vulnshield-platform
+make deploy
+```
+
+Then open **http://127.0.0.1:3002** and sign in:
+
+| Field | Value |
+|-------|--------|
+| Username | `admin` |
+| Password | `Admin@123456` |
+
+Full quick-start → [GETTING_STARTED.md](GETTING_STARTED.md). Security checklist → [docs/SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md)
 
 | After deploy | URL |
 |--------------|-----|
-| **Dashboard** | http://localhost:3002 (or http://127.0.0.1:3002) |
-| **API** | http://localhost:18080/api/v1 |
-| **Health check** | http://localhost:18080/health |
+| **Dashboard** | http://127.0.0.1:3002 |
+| **API** | http://127.0.0.1:18080/api/v1 |
+| **Health check** | http://127.0.0.1:18080/health |
 
-Log in with the admin credentials printed by `make sandbox-env`. Full security checklist → [docs/SANDBOX_DEPLOYMENT.md](docs/SANDBOX_DEPLOYMENT.md)
+### Legacy two-step deploy
+
+```bash
+make sandbox-env   # optional if .env.sandbox already exists
+make sandbox-up
+```
+
 
 ### Other deployment options
 

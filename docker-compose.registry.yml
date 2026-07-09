@@ -1,0 +1,67 @@
+# Pull pre-built images from GitHub Container Registry (no local build).
+# Usage:
+#   VULNSHIELD_USE_REGISTRY=1 make deploy
+#   # or
+#   ./scripts/deploy-pull.sh
+#
+# Images: ghcr.io/rahul1713/vulnshield-<service>:<tag>
+
+x-ghcr-image: &ghcr-image
+  pull_policy: always
+
+services:
+  api-gateway:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-api-gateway:${VULNSHIELD_TAG:-latest}
+
+  auth-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-auth-service:${VULNSHIELD_TAG:-latest}
+
+  asset-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-asset-service:${VULNSHIELD_TAG:-latest}
+
+  scanner-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-scanner-service:${VULNSHIELD_TAG:-latest}
+
+  web-scanner-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-web-scanner-service:${VULNSHIELD_TAG:-latest}
+
+  scan-worker:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-scan-worker:${VULNSHIELD_TAG:-latest}
+
+  ai-code-review:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-ai-code-review:${VULNSHIELD_TAG:-latest}
+
+  ai-redteam:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-ai-redteam:${VULNSHIELD_TAG:-latest}
+
+  patch-intelligence:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-patch-intelligence:${VULNSHIELD_TAG:-latest}
+
+  risk-engine:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-risk-engine:${VULNSHIELD_TAG:-latest}
+
+  reporting-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-reporting-service:${VULNSHIELD_TAG:-latest}
+
+  compliance-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-compliance-service:${VULNSHIELD_TAG:-latest}
+
+  notification-service:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-notification-service:${VULNSHIELD_TAG:-latest}
+
+  frontend:
+    <<: *ghcr-image
+    image: ${VULNSHIELD_REGISTRY:-ghcr.io/rahul1713/vulnshield}-frontend:${VULNSHIELD_TAG:-latest}

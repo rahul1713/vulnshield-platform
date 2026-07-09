@@ -2,6 +2,8 @@ name: Docker Publish
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
   workflow_dispatch:
@@ -29,45 +31,63 @@ jobs:
           - service: api-gateway
             context: services/api-gateway
             dockerfile: services/api-gateway/Dockerfile
+            build_args: ""
           - service: auth-service
             context: .
             dockerfile: services/auth-service/Dockerfile
+            build_args: ""
           - service: asset-service
             context: .
             dockerfile: services/asset-service/Dockerfile
+            build_args: ""
           - service: scanner-service
             context: .
             dockerfile: services/scanner-service/Dockerfile
+            build_args: ""
           - service: web-scanner-service
             context: .
             dockerfile: services/web-scanner-service/Dockerfile
+            build_args: ""
+          - service: scan-worker
+            context: .
+            dockerfile: services/scan-worker/Dockerfile
+            build_args: ""
           - service: ai-code-review
             context: .
             dockerfile: services/ai-code-review/Dockerfile
+            build_args: ""
           - service: ai-redteam
             context: .
             dockerfile: services/ai-redteam/Dockerfile
+            build_args: ""
           - service: patch-intelligence
             context: .
             dockerfile: services/patch-intelligence/Dockerfile
+            build_args: ""
           - service: risk-engine
             context: .
             dockerfile: services/risk-engine/Dockerfile
+            build_args: ""
           - service: reporting-service
             context: .
             dockerfile: services/reporting-service/Dockerfile
+            build_args: ""
           - service: compliance-service
             context: .
             dockerfile: services/compliance-service/Dockerfile
+            build_args: ""
           - service: notification-service
             context: .
             dockerfile: services/notification-service/Dockerfile
+            build_args: ""
           - service: frontend
             context: frontend
             dockerfile: frontend/Dockerfile
-          - service: linux-agent
-            context: agents/linux
-            dockerfile: agents/linux/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_API_URL=http://127.0.0.1:18080/api/v1
+              NEXT_PUBLIC_API_PORT=18080
+              NEXT_PUBLIC_DEPLOY_ENV=sandbox
+              NEXT_PUBLIC_ENABLE_DEMO_MODE=false
 
     steps:
       - uses: actions/checkout@v4
@@ -77,8 +97,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to GitHub Container Registry
@@ -91,15 +113,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ steps.tag.outputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.tag.outputs.tag }}
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Parse build args
+        id: buildargs
+        run: |
+          if [ -n "${{ matrix.build_args }}" ]; then
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "${line}" >> "$GITHUB_OUTPUT"
+            done <<< "${{ matrix.build_args }}"
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -110,10 +132,9 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ steps.tag.outputs.tag }}
             ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
-          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-        continue-on-error: true
 
   publish-summary:
     name: Publish Summary
@@ -126,4 +147,5 @@ jobs:
           echo "## Docker Images Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Registry: ghcr.io/${{ github.repository_owner }}/vulnshield-*" >> $GITHUB_STEP_SUMMARY
-          echo "Tag: ${{ github.ref_name || inputs.tag || 'latest' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Org deploy: \`make deploy-pull\`" >> $GITHUB_STEP_SUMMARY

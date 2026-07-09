@@ -4,9 +4,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap curl git ca-certificates unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install nuclei
+# Install nuclei (multi-arch)
 ARG NUCLEI_VERSION=3.3.7
-RUN curl -fsSL "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip" \
+ARG TARGETARCH
+RUN ARCH="${TARGETARCH:-amd64}" && \
+    curl -fsSL "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_${ARCH}.zip" \
     -o /tmp/nuclei.zip \
     && unzip /tmp/nuclei.zip -d /usr/local/bin \
     && chmod +x /usr/local/bin/nuclei \

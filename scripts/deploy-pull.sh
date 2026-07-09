@@ -13,6 +13,12 @@ echo "=== VulnShield Registry Deploy ==="
 echo "Registry: ${VULNSHIELD_REGISTRY}-*:${VULNSHIELD_TAG}"
 echo ""
 
+# Apple Silicon: use amd64 images until multi-arch manifest is published (or set DOCKER_DEFAULT_PLATFORM=linux/arm64 after rebuild).
+if [[ "$(uname -m)" == "arm64" && -z "${DOCKER_DEFAULT_PLATFORM:-}" ]]; then
+  export DOCKER_DEFAULT_PLATFORM=linux/amd64
+  echo "Apple Silicon detected — pulling linux/amd64 images (Docker emulation)."
+fi
+
 if ! docker info >/dev/null 2>&1; then
   echo "Docker is not running. Start Docker Desktop and retry." >&2
   exit 1

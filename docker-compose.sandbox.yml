@@ -5,7 +5,7 @@
 
 x-sandbox-env: &sandbox-env
   ENVIRONMENT: sandbox
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://127.0.0.1:3002}
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required for sandbox}
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for sandbox}
   INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-admin}
@@ -62,7 +62,7 @@ services:
     environment:
       <<: *sandbox-env
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-    ports:
+    ports: !override
       - "127.0.0.1:18080:8080"
 
   auth-service:
@@ -113,11 +113,11 @@ services:
   frontend:
     build:
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:18080/api/v1}
         NEXT_PUBLIC_DEPLOY_ENV: sandbox
         NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
     environment:
       NEXT_PUBLIC_DEPLOY_ENV: sandbox
       NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"
-    ports:
-      - "127.0.0.1:3000:3000"
+    ports: !override
+      - "127.0.0.1:3002:3000"
